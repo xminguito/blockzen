@@ -1,0 +1,48 @@
+{
+  "expo": {
+    "name": "BlockZen",
+    "slug": "blockzen",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "scheme": "blockzen",
+    "userInterfaceStyle": "dark",
+    "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0B0B1E"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.blockzen.app",
+      "requireFullScreen": true,
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#0B0B1E"
+      },
+      "package": "com.blockzen.app"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-asset",
+      "expo-font"
+    ],
+    "experiments": {
+      "typedRoutes": true
+    },
+    "extra": {
+      "router": {
+        "origin": false
+      },
+      "eas": {
+        "projectId": "c6e81758-a94d-4c50-91d9-49b22c7d1468"
+      }
+    }
+  }
+}
