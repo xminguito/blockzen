@@ -34,10 +34,12 @@ import Animated, {
 import { useGame } from '../src/state/useGame';
 import { useHighScore } from '../src/state/useHighScore';
 import { useDaily } from '../src/state/useDaily';
-import { Board, computeBoardGeometry } from '../src/ui/components/Board';
+import { useSettings } from '../src/state/useSettings';
+import { Board, computeBoardGeometry, BOARD_PADDING, INNER_PAD } from '../src/ui/components/Board';
 import { ParticleCanvas } from '../src/ui/components/ParticleCanvas';
 import { BlockTray } from '../src/ui/components/BlockTray';
 import { GameOverModal } from '../src/ui/components/GameOverModal';
+import { SettingsModal } from '../src/ui/components/SettingsModal';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // ANIMATED SCORE
@@ -103,6 +105,8 @@ export default function DailyScreen() {
   // Game state (daily mode)
   const game = useGame('daily');
   const { highScore, isNewHighScore, submitScore } = useHighScore('daily');
+  const { settings, toggleSound, toggleVibration } = useSettings();
+  const [settingsVisible, setSettingsVisible] = useState(false);
 
   // Handle game over: submit score + record daily result
   const prevGameOver = useRef(false);
@@ -115,11 +119,27 @@ export default function DailyScreen() {
     prevGameOver.current = false;
   }
 
+  const boardTopRef = useRef(0);
   const onBoardLayout = useCallback(() => {
-    boardRef.current?.measure((_x, _y, _w, _h, _px, pageY) => {
-      setBoardTopY(pageY);
+    boardRef.current?.measureInWindow((_x, y) => {
+      boardTopRef.current = y;
+      setBoardTopY(y);
     });
   }, []);
+
+  // Screen coords → grid position. Fresh boardTopY via ref.
+  const BORDER_W = 1.5;
+  const stride = cellSize + gap;
+  const screenToGrid = useCallback(
+    (sx: number, sy: number, blockW: number, blockH: number): [number, number] => {
+      const boardLeft = BOARD_PADDING + BORDER_W + INNER_PAD;
+      const boardTop = boardTopRef.current + BORDER_W + INNER_PAD;
+      const localX = sx - boardLeft - (blockW * stride) / 2;
+      const localY = sy - boardTop - (blockH * stride) / 2;
+      return [Math.round(localY / stride), Math.round(localX / stride)];
+    },
+    [stride],
+  );
 
   // Gate: if already played today, show results instead
   if (!isLoading && hasPlayedToday && !game.isGameOver) {
@@ -176,6 +196,14 @@ export default function DailyScreen() {
             <Text style={styles.scoreLabel}>SCORE</Text>
             <AnimatedDailyScore score={game.score} />
           </View>
+
+          <Pressable
+            onPress={() => setSettingsVisible(true)}
+            style={styles.gearButton}
+            hitSlop={10}
+          >
+            <Text style={styles.gearIcon}>⚙️</Text>
+          </Pressable>
         </View>
 
         {/* Combo */}
@@ -216,7 +244,7 @@ export default function DailyScreen() {
         <BlockTray
           pieces={game.tray}
           trayGen={game.trayGen}
-          boardTopY={boardTopY}
+          screenToGrid={screenToGrid}
           onDragUpdate={game.updateGhostPreview}
           onDragEnd={game.clearGhostPreview}
           onPlace={game.handleBlockPlaced}
@@ -234,6 +262,18 @@ export default function DailyScreen() {
         mode="daily"
         onRestart={() => router.replace('/')}
         onHome={() => router.replace('/')}
+      />
+
+      {/* Settings Modal */}
+      <SettingsModal
+        visible={settingsVisible}
+        soundEnabled={settings.soundEnabled}
+        vibrationEnabled={settings.vibrationEnabled}
+        onToggleSound={toggleSound}
+        onToggleVibration={toggleVibration}
+        onRestart={() => game.restart()}
+        onHome={() => router.replace('/')}
+        onClose={() => setSettingsVisible(false)}
       />
     </SafeAreaView>
   );
@@ -294,6 +334,20 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: '900',
     color: '#FFFFFF',
+  },
+  gearButton: {
+    position: 'absolute',
+    right: 16,
+    top: 8,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  gearIcon: {
+    fontSize: 20,
   },
   comboContainer: {
     alignItems: 'center',

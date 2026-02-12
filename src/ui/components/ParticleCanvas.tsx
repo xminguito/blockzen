@@ -161,6 +161,7 @@ export function ParticleCanvas({
     const particles = particlesRef.current;
     if (particles.length === 0) {
       particleData.value = [];
+      animFrameRef.current = null; // CRITICAL: clear ref so startAnimation works next time
       return;
     }
 
@@ -215,6 +216,8 @@ export function ParticleCanvas({
 
     if (alive.length > 0) {
       animFrameRef.current = setTimeout(tick, FRAME_INTERVAL);
+    } else {
+      animFrameRef.current = null; // all particles dead — allow restart
     }
   }, [particleData]);
 

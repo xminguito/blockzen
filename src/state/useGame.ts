@@ -78,9 +78,13 @@ import('expo-haptics')
   .then((m) => { HapticsModule = m; })
   .catch(() => { /* web / unsupported — silent degrade */ });
 
+import { isVibrationEnabled } from './useSettings';
+import { playSound, playSoundWithVolume } from '../core/sounds';
+
 function triggerHaptic(level: HapticLevel): void {
   const H = HapticsModule;
   if (!H) return;
+  if (!isVibrationEnabled()) return;
 
   switch (level) {
     case 'selection':
@@ -332,6 +336,7 @@ export function useGame(mode: GameMode = 'classic'): UseGameReturn {
       switch (phase.type) {
         case 'place': {
           triggerHaptic(getPhaseHaptic(phase));
+          playSound('place');
           const buf = displayBufferRef.current;
           for (const i of phase.indices) {
             buf[i] = phase.colorId;
@@ -343,6 +348,7 @@ export function useGame(mode: GameMode = 'classic'): UseGameReturn {
 
         case 'lineClear': {
           triggerHaptic(getPhaseHaptic(phase));
+          playSound('clear');
 
           // Step 1: Brief white flash (pop effect)
           for (const i of phase.cleared) {
@@ -413,6 +419,8 @@ export function useGame(mode: GameMode = 'classic'): UseGameReturn {
 
         case 'combo': {
           triggerHaptic(getPhaseHaptic(phase));
+          // Escalating combo volume: louder with higher combos
+          playSoundWithVolume('combo', Math.min(1, 0.5 + phase.level * 0.1));
           setCombo(phase.level);
           setComboLabel(getComboLabel(phase.level));
           await wait(PHASE_TIMING.combo);
@@ -584,6 +592,7 @@ export function useGame(mode: GameMode = 'classic'): UseGameReturn {
         gameOverRef.current = true;
         playPhases(phases).then(() => {
           triggerHaptic('gameOver');
+          playSound('gameover');
           setIsGameOver(true);
         });
       } else {

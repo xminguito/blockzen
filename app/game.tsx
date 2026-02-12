@@ -37,10 +37,12 @@ import Animated, {
 
 import { useGame } from '../src/state/useGame';
 import { useHighScore } from '../src/state/useHighScore';
-import { Board, computeBoardGeometry } from '../src/ui/components/Board';
+import { useSettings } from '../src/state/useSettings';
+import { Board, computeBoardGeometry, BOARD_PADDING, INNER_PAD } from '../src/ui/components/Board';
 import { ParticleCanvas } from '../src/ui/components/ParticleCanvas';
 import { BlockTray } from '../src/ui/components/BlockTray';
 import { GameOverModal } from '../src/ui/components/GameOverModal';
+import { SettingsModal } from '../src/ui/components/SettingsModal';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // CONSTANTS
@@ -184,6 +186,8 @@ export default function GameScreen() {
   // Game state
   const game = useGame('classic');
   const { highScore, isNewHighScore, submitScore } = useHighScore('classic');
+  const { settings, toggleSound, toggleVibration } = useSettings();
+  const [settingsVisible, setSettingsVisible] = useState(false);
 
   // Floating points state
   const [floatingPoints, setFloatingPoints] = useState<{
@@ -201,20 +205,25 @@ export default function GameScreen() {
     id: number;
   } | null>(null);
   const comboIdRef = useRef(0);
+  const comboTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const floatingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Track score changes for floating "+N" and combo overlay
+  // Track score changes for floating "+N"
   useEffect(() => {
     const delta = game.score - prevScoreRef.current;
     if (delta > 0 && prevScoreRef.current > 0) {
       floatingIdRef.current += 1;
       setFloatingPoints({ points: delta, id: floatingIdRef.current });
-      const timer = setTimeout(() => setFloatingPoints(null), 800);
-      return () => clearTimeout(timer);
+      if (floatingTimerRef.current) clearTimeout(floatingTimerRef.current);
+      floatingTimerRef.current = setTimeout(() => {
+        setFloatingPoints(null);
+        floatingTimerRef.current = null;
+      }, 800);
     }
     prevScoreRef.current = game.score;
   }, [game.score]);
 
-  // Track combo changes for board overlay
+  // Track combo changes for board overlay — timer managed via ref, NOT useEffect cleanup
   useEffect(() => {
     if (game.comboLabel && game.combo >= 2) {
       comboIdRef.current += 1;
@@ -225,9 +234,13 @@ export default function GameScreen() {
         points: delta > 0 ? delta : game.score,
         id: comboIdRef.current,
       });
-      const timer = setTimeout(() => setComboOverlay(null), 1200);
-      return () => clearTimeout(timer);
+      if (comboTimerRef.current) clearTimeout(comboTimerRef.current);
+      comboTimerRef.current = setTimeout(() => {
+        setComboOverlay(null);
+        comboTimerRef.current = null;
+      }, 1400);
     }
+    // NO cleanup return — timer lives independently of effect re-runs
   }, [game.comboLabel, game.combo, game.score]);
 
   // Submit score when game ends
@@ -240,12 +253,28 @@ export default function GameScreen() {
     prevGameOver.current = false;
   }
 
-  // Board layout measurement
+  // Board layout measurement — use measureInWindow for screen-absolute coords
+  const boardTopRef = useRef(0);
   const onBoardLayout = useCallback(() => {
-    boardRef.current?.measure((_x, _y, _w, _h, _px, pageY) => {
-      setBoardTopY(pageY);
+    boardRef.current?.measureInWindow((_x, y) => {
+      boardTopRef.current = y;
+      setBoardTopY(y);
     });
   }, []);
+
+  // Screen coords → grid position. Lives here so it always uses fresh boardTopY.
+  const BORDER_W = 1.5;
+  const stride = cellSize + gap;
+  const screenToGrid = useCallback(
+    (sx: number, sy: number, blockW: number, blockH: number): [number, number] => {
+      const boardLeft = BOARD_PADDING + BORDER_W + INNER_PAD;
+      const boardTop = boardTopRef.current + BORDER_W + INNER_PAD;
+      const localX = sx - boardLeft - (blockW * stride) / 2;
+      const localY = sy - boardTop - (blockH * stride) / 2;
+      return [Math.round(localY / stride), Math.round(localX / stride)];
+    },
+    [stride],
+  );
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -267,6 +296,14 @@ export default function GameScreen() {
               {Math.max(highScore, game.score).toLocaleString()}
             </Text>
           </View>
+
+          <Pressable
+            onPress={() => setSettingsVisible(true)}
+            style={styles.gearButton}
+            hitSlop={10}
+          >
+            <Text style={styles.gearIcon}>⚙️</Text>
+          </Pressable>
         </View>
 
         {/* Board + Particles + Combo Overlay */}
@@ -317,7 +354,7 @@ export default function GameScreen() {
         <BlockTray
           pieces={game.tray}
           trayGen={game.trayGen}
-          boardTopY={boardTopY}
+          screenToGrid={screenToGrid}
           onDragUpdate={game.updateGhostPreview}
           onDragEnd={game.clearGhostPreview}
           onPlace={game.handleBlockPlaced}
@@ -342,6 +379,18 @@ export default function GameScreen() {
         mode="classic"
         onRestart={() => game.restart()}
         onHome={() => router.replace('/')}
+      />
+
+      {/* Settings Modal */}
+      <SettingsModal
+        visible={settingsVisible}
+        soundEnabled={settings.soundEnabled}
+        vibrationEnabled={settings.vibrationEnabled}
+        onToggleSound={toggleSound}
+        onToggleVibration={toggleVibration}
+        onRestart={() => game.restart()}
+        onHome={() => router.replace('/')}
+        onClose={() => setSettingsVisible(false)}
       />
     </SafeAreaView>
   );
@@ -406,6 +455,20 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '800',
     color: 'rgba(255, 255, 255, 0.5)',
+  },
+  gearButton: {
+    position: 'absolute',
+    right: 16,
+    top: 8,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  gearIcon: {
+    fontSize: 20,
   },
   // ── Board ──
   boardContainer: {

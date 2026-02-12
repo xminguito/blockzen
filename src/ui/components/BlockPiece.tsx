@@ -9,7 +9,7 @@
  * - Ghost preview updates only on grid-position change
  */
 
-import React, { useEffect, useMemo, useRef } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef } from 'react';
 import { StyleSheet, useWindowDimensions } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
@@ -32,12 +32,11 @@ const TRAY_CELL_SIZE = 24;
 const TRAY_GAP = 3;
 const TRAY_CORNER_RADIUS = 5;
 
-const DRAG_OFFSET_Y = -35; // Small lift — keeps piece visible above finger
+// Offset: piece bottom sits ~15pt above the finger, scales with piece height
+const FINGER_GAP = 15;
 const SNAP_SPRING = { damping: 14, stiffness: 280, mass: 0.6 };
 const SCALE_SPRING = { damping: 12, stiffness: 250, mass: 0.5 };
 
-const BOARD_PADDING = 16;
-const INNER_PAD = 8; // Must match Board.tsx INNER_PAD
 
 // ═══════════════════════════════════════════════════════════════════════════
 // PROPS
@@ -50,7 +49,8 @@ export interface BlockPieceProps {
   height: number;
   colorId: number;
   placed: boolean;
-  boardTopY: number;
+  /** Convert piece screen center → grid (row, col). Defined in game screen where boardTopY is fresh. */
+  screenToGrid: (sx: number, sy: number, bw: number, bh: number) => [number, number];
   onDragUpdate: (blockIndex: number, row: number, col: number) => void;
   onDragEnd: () => void;
   onPlace: (blockIndex: number, row: number, col: number) => void;
@@ -68,7 +68,7 @@ export function BlockPiece({
   height: blockHeight,
   colorId,
   placed,
-  boardTopY,
+  screenToGrid,
   onDragUpdate,
   onDragEnd,
   onPlace,
@@ -78,7 +78,17 @@ export function BlockPiece({
   const { cellSize, gap } = computeBoardGeometry(screenWidth);
 
   // Scale factor: piece grows to match board cell size during drag
-  const dragScale = (cellSize + gap) / (TRAY_CELL_SIZE + TRAY_GAP);
+  const boardStride = cellSize + gap;
+  const dragScale = boardStride / (TRAY_CELL_SIZE + TRAY_GAP);
+
+  // Dynamic Y offset: piece center sits above finger by half the scaled height + gap
+  const dragOffsetY = -(blockHeight * boardStride * 0.5) - FINGER_GAP;
+
+  // Store offset in SharedValue so worklet always has the correct value
+  const dragOffsetYSV = useSharedValue(dragOffsetY);
+  useEffect(() => {
+    dragOffsetYSV.value = dragOffsetY;
+  }, [dragOffsetY, dragOffsetYSV]);
 
   // Track last grid position to avoid redundant ghost updates
   const lastGridPosRef = useRef<string>('');
@@ -90,6 +100,10 @@ export function BlockPiece({
   const opacity = useSharedValue(placed ? 0 : 1);
   const isDragging = useSharedValue(false);
   const zIndex = useSharedValue(0);
+
+  // Initial touch offset from piece center (to compensate for non-center touches)
+  const touchOffsetX = useSharedValue(0);
+  const touchOffsetY = useSharedValue(0);
 
   // Reset when piece is recycled
   useEffect(() => {
@@ -139,57 +153,94 @@ export function BlockPiece({
     return `rgba(${Math.round(lr * 255)}, ${Math.round(lg * 255)}, ${Math.round(lb * 255)}, 0.45)`;
   }, [colorId]);
 
-  // Compute grid position from screen coordinates (JS thread only)
-  const computeGridPos = (absX: number, absY: number): [number, number] => {
-    const boardLeft = BOARD_PADDING + INNER_PAD;
-    const boardTop = boardTopY + INNER_PAD;
-    const stride = cellSize + gap;
-    const localX = absX - boardLeft - (blockWidth * stride) / 2;
-    const localY = absY - boardTop - (blockHeight * stride) / 2 + DRAG_OFFSET_Y;
-    const col = Math.round(localX / stride);
-    const row = Math.round(localY / stride);
-    return [row, col];
+  // ── Stable handler refs ────────────────────────────────────────────────
+  // Prevents stale closures: runOnJS always calls the latest handler version.
+  // screenToGrid comes from game.tsx where boardTopY is measured — always fresh.
+  const handlersRef = useRef({
+    screenToGrid,
+    onDragUpdate,
+    onDragEnd,
+    onPlace,
+    canPlaceAt,
+    index,
+    blockWidth,
+    blockHeight,
+    lastGridPosRef,
+    opacity: null as typeof opacity | null,
+    scale: null as typeof scale | null,
+  });
+  handlersRef.current = {
+    screenToGrid,
+    onDragUpdate,
+    onDragEnd,
+    onPlace,
+    canPlaceAt,
+    index,
+    blockWidth,
+    blockHeight,
+    lastGridPosRef,
+    opacity,
+    scale,
   };
 
-  // Only fire ghost update when grid position actually changes
-  const handleDragUpdate = (absX: number, absY: number) => {
-    const [row, col] = computeGridPos(absX, absY);
+  // Stable callbacks (identity never changes → safe for runOnJS)
+  const stableUpdate = useCallback((pcx: number, pcy: number) => {
+    const h = handlersRef.current;
+    const [row, col] = h.screenToGrid(pcx, pcy, h.blockWidth, h.blockHeight);
     const key = `${row},${col}`;
-    if (key !== lastGridPosRef.current) {
-      lastGridPosRef.current = key;
-      onDragUpdate(index, row, col);
+    if (key !== h.lastGridPosRef.current) {
+      h.lastGridPosRef.current = key;
+      h.onDragUpdate(h.index, row, col);
     }
-  };
+  }, []);
 
-  const handleDragEnd = (absX: number, absY: number) => {
-    lastGridPosRef.current = '';
-    onDragEnd();
-    const [row, col] = computeGridPos(absX, absY);
-    if (canPlaceAt(index, row, col)) {
-      opacity.value = withTiming(0, { duration: 120 });
-      scale.value = withTiming(0.85, { duration: 120 });
-      onPlace(index, row, col);
+  const stableEnd = useCallback((pcx: number, pcy: number) => {
+    const h = handlersRef.current;
+    h.lastGridPosRef.current = '';
+    h.onDragEnd();
+    const [row, col] = h.screenToGrid(pcx, pcy, h.blockWidth, h.blockHeight);
+    if (h.canPlaceAt(h.index, row, col)) {
+      if (h.opacity) h.opacity.value = withTiming(0, { duration: 120 });
+      if (h.scale) h.scale.value = withTiming(0.85, { duration: 120 });
+      h.onPlace(h.index, row, col);
     }
-  };
+  }, []);
 
   // ── Pan Gesture ──────────────────────────────────────────────────────────
+  // - Uses SharedValue for dragOffsetY (always in sync)
+  // - Records initial touch offset to compensate for non-center touches
+  // - runOnJS → stable callbacks (never stale)
   const panGesture = Gesture.Pan()
-    .onStart(() => {
+    .minDistance(0)
+    .shouldCancelWhenOutside(false)
+    .onStart((event) => {
       'worklet';
+      // Record how far the finger is from the piece center
+      // event.x/y = finger position within the gesture handler view
+      touchOffsetX.value = event.x - (pieceWidth + 8) / 2;
+      touchOffsetY.value = event.y - (pieceHeight + 8) / 2;
       isDragging.value = true;
       scale.value = withSpring(dragScale, SCALE_SPRING);
+      translateY.value = dragOffsetYSV.value; // immediately lift
       zIndex.value = 100;
     })
     .onUpdate((event) => {
       'worklet';
+      const offy = dragOffsetYSV.value;
       translateX.value = event.translationX;
-      translateY.value = event.translationY + DRAG_OFFSET_Y;
-      runOnJS(handleDragUpdate)(event.absoluteX, event.absoluteY);
+      translateY.value = event.translationY + offy;
+      // Piece center = finger pos - touch offset + drag offset
+      const pcx = event.absoluteX - touchOffsetX.value;
+      const pcy = event.absoluteY - touchOffsetY.value + offy;
+      runOnJS(stableUpdate)(pcx, pcy);
     })
     .onEnd((event) => {
       'worklet';
       isDragging.value = false;
-      runOnJS(handleDragEnd)(event.absoluteX, event.absoluteY);
+      const offy = dragOffsetYSV.value;
+      const pcx = event.absoluteX - touchOffsetX.value;
+      const pcy = event.absoluteY - touchOffsetY.value + offy;
+      runOnJS(stableEnd)(pcx, pcy);
       translateX.value = withSpring(0, SNAP_SPRING);
       translateY.value = withSpring(0, SNAP_SPRING);
       scale.value = withSpring(1, SNAP_SPRING);

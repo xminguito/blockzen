@@ -14,6 +14,7 @@
     "@types/react": "~18.3.12",
     "expo": "^52.0.0",
     "expo-asset": "~11.0.5",
+    "expo-av": "~15.0.2",
     "expo-blur": "~14.0.3",
     "expo-constants": "~17.0.8",
     "expo-dev-client": "~5.0.20",

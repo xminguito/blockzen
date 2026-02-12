@@ -31,7 +31,7 @@ const STAGGER_DELAY = 80; // ms between each piece appearing
 export interface BlockTrayProps {
   pieces: TrayPiece[];
   trayGen: number; // generation counter — forces remount on new tray set
-  boardTopY: number;
+  screenToGrid: (sx: number, sy: number, bw: number, bh: number) => [number, number];
   onDragUpdate: (blockIndex: number, row: number, col: number) => void;
   onDragEnd: () => void;
   onPlace: (blockIndex: number, row: number, col: number) => void;
@@ -45,7 +45,7 @@ export interface BlockTrayProps {
 export function BlockTray({
   pieces,
   trayGen,
-  boardTopY,
+  screenToGrid,
   onDragUpdate,
   onDragEnd,
   onPlace,
@@ -63,7 +63,7 @@ export function BlockTray({
             height={piece.block.height}
             colorId={piece.colorId}
             placed={piece.placed}
-            boardTopY={boardTopY}
+            screenToGrid={screenToGrid}
             onDragUpdate={onDragUpdate}
             onDragEnd={onDragEnd}
             onPlace={onPlace}
