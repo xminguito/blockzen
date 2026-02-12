@@ -38,6 +38,8 @@ import Animated, {
 import { useGame } from '../src/state/useGame';
 import { useHighScore } from '../src/state/useHighScore';
 import { useSettings } from '../src/state/useSettings';
+import { useGameCenter } from '../src/state/useGameCenter';
+import { LEADERBOARD_IDS } from '../src/core/constants';
 import { Board, computeBoardGeometry, BOARD_PADDING, INNER_PAD } from '../src/ui/components/Board';
 import { ParticleCanvas } from '../src/ui/components/ParticleCanvas';
 import { BlockTray } from '../src/ui/components/BlockTray';
@@ -187,6 +189,7 @@ export default function GameScreen() {
   const game = useGame('classic');
   const { highScore, isNewHighScore, submitScore } = useHighScore('classic');
   const { settings, toggleSound, toggleVibration } = useSettings();
+  const { submitScore: submitToGameCenter, presentDashboard } = useGameCenter();
   const [settingsVisible, setSettingsVisible] = useState(false);
 
   // Floating points state
@@ -243,11 +246,12 @@ export default function GameScreen() {
     // NO cleanup return — timer lives independently of effect re-runs
   }, [game.comboLabel, game.combo, game.score]);
 
-  // Submit score when game ends
+  // Submit score when game ends (local + Game Center fire-and-forget)
   const prevGameOver = useRef(false);
   if (game.isGameOver && !prevGameOver.current) {
     prevGameOver.current = true;
     submitScore(game.score);
+    submitToGameCenter(game.score, LEADERBOARD_IDS.classic);
   }
   if (!game.isGameOver && prevGameOver.current) {
     prevGameOver.current = false;
@@ -379,6 +383,7 @@ export default function GameScreen() {
         mode="classic"
         onRestart={() => game.restart()}
         onHome={() => router.replace('/')}
+        onShowLeaderboard={() => presentDashboard(LEADERBOARD_IDS.classic)}
       />
 
       {/* Settings Modal */}

@@ -35,6 +35,8 @@ import { useGame } from '../src/state/useGame';
 import { useHighScore } from '../src/state/useHighScore';
 import { useDaily } from '../src/state/useDaily';
 import { useSettings } from '../src/state/useSettings';
+import { useGameCenter } from '../src/state/useGameCenter';
+import { LEADERBOARD_IDS } from '../src/core/constants';
 import { Board, computeBoardGeometry, BOARD_PADDING, INNER_PAD } from '../src/ui/components/Board';
 import { ParticleCanvas } from '../src/ui/components/ParticleCanvas';
 import { BlockTray } from '../src/ui/components/BlockTray';
@@ -106,6 +108,7 @@ export default function DailyScreen() {
   const game = useGame('daily');
   const { highScore, isNewHighScore, submitScore } = useHighScore('daily');
   const { settings, toggleSound, toggleVibration } = useSettings();
+  const { submitScore: submitToGameCenter, presentDashboard } = useGameCenter();
   const [settingsVisible, setSettingsVisible] = useState(false);
 
   // Handle game over: submit score + record daily result
@@ -114,6 +117,7 @@ export default function DailyScreen() {
     prevGameOver.current = true;
     submitScore(game.score);
     recordDailyResult(game.score);
+    submitToGameCenter(game.score, LEADERBOARD_IDS.daily);
   }
   if (!game.isGameOver && prevGameOver.current) {
     prevGameOver.current = false;
@@ -262,6 +266,7 @@ export default function DailyScreen() {
         mode="daily"
         onRestart={() => router.replace('/')}
         onHome={() => router.replace('/')}
+        onShowLeaderboard={() => presentDashboard(LEADERBOARD_IDS.daily)}
       />
 
       {/* Settings Modal */}

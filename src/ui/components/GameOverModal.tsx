@@ -33,6 +33,8 @@ export interface GameOverModalProps {
   mode: 'classic' | 'daily';
   onRestart: () => void;
   onHome: () => void;
+  /** Optional: opens Game Center leaderboard (iOS only) */
+  onShowLeaderboard?: () => void;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -48,6 +50,7 @@ export function GameOverModal({
   mode,
   onRestart,
   onHome,
+  onShowLeaderboard,
 }: GameOverModalProps) {
   if (!visible) return null;
 
@@ -105,6 +108,17 @@ export function GameOverModal({
                 {mode === 'daily' ? 'View Board' : 'Play Again'}
               </Text>
             </Pressable>
+
+            {onShowLeaderboard != null && (
+              <Pressable
+                style={[styles.button, styles.leaderboardButton]}
+                onPress={onShowLeaderboard}
+              >
+                <Text style={[styles.buttonText, styles.leaderboardText]}>
+                  Ver clasificación
+                </Text>
+              </Pressable>
+            )}
 
             <Pressable
               style={[styles.button, styles.secondaryButton]}
@@ -218,6 +232,14 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(140, 230, 205, 0.2)',
     borderWidth: 1,
     borderColor: 'rgba(140, 230, 205, 0.3)',
+  },
+  leaderboardButton: {
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.12)',
+  },
+  leaderboardText: {
+    color: 'rgba(255, 255, 255, 0.85)',
   },
   secondaryButton: {
     backgroundColor: 'rgba(255, 255, 255, 0.05)',

@@ -1,0 +1,18 @@
+{
+  "name": "expo-game-center",
+  "version": "1.0.0",
+  "description": "Apple Game Center integration for Expo",
+  "main": "src/ExpoGameCenter.ts",
+  "types": "src/ExpoGameCenter.ts",
+  "scripts": {
+    "build": "expo-module build",
+    "clean": "expo-module clean",
+    "lint": "expo-module lint"
+  },
+  "keywords": ["expo", "game-center", "gamekit", "leaderboard"],
+  "repository": { "type": "git", "url": "" },
+  "author": "",
+  "license": "MIT",
+  "peerDependencies": { "expo": "*" },
+  "devDependencies": { "expo-module-scripts": "^4.0.3" }
+}

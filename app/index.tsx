@@ -12,6 +12,7 @@ import {
   StyleSheet,
   Pressable,
   SafeAreaView,
+  Platform,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import Animated, {
@@ -21,6 +22,8 @@ import Animated, {
 
 import { readHighScore } from '../src/state/useHighScore';
 import { useDaily } from '../src/state/useDaily';
+import { useGameCenter } from '../src/state/useGameCenter';
+import { LEADERBOARD_IDS } from '../src/core/constants';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // MINI BLOCK PREVIEW — decorative colored squares for cards
@@ -115,12 +118,24 @@ export default function HomeScreen() {
   const router = useRouter();
   const [classicHigh, setClassicHigh] = useState(0);
   const { dailySeedLabel, hasPlayedToday, todayScore, isLoading } = useDaily();
+  const {
+    isAuthenticated,
+    friendsScores,
+    fetchFriendsScores,
+    presentDashboard,
+  } = useGameCenter();
 
   const today = new Date().getDate();
 
   useEffect(() => {
     readHighScore('classic').then(setClassicHigh);
   }, []);
+
+  useEffect(() => {
+    if (Platform.OS === 'ios' && isAuthenticated) {
+      fetchFriendsScores(LEADERBOARD_IDS.classic);
+    }
+  }, [isAuthenticated, fetchFriendsScores]);
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -190,6 +205,40 @@ export default function HomeScreen() {
             </Pressable>
           </Animated.View>
         </View>
+
+        {/* Game Center: Amigos a batir + Ver clasificación (iOS) */}
+        {Platform.OS === 'ios' && isAuthenticated && (
+          <Animated.View
+            style={styles.gameCenterSection}
+            entering={FadeInUp.delay(400).springify()}
+          >
+            {friendsScores.length > 0 && (
+              <View style={styles.friendsBlock}>
+                <Text style={styles.friendsTitle}>Amigos a batir</Text>
+                {friendsScores.slice(0, 5).map((entry, i) => (
+                  <View key={entry.playerId} style={styles.friendRow}>
+                    <Text style={styles.friendRank}>{i + 1}.</Text>
+                    <Text style={styles.friendName} numberOfLines={1}>
+                      {entry.alias ?? entry.playerId}
+                    </Text>
+                    <Text style={styles.friendScore}>
+                      {entry.score.toLocaleString()}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+            )}
+            <Pressable
+              style={({ pressed }) => [
+                styles.leaderboardButton,
+                pressed && styles.leaderboardPressed,
+              ]}
+              onPress={() => presentDashboard(LEADERBOARD_IDS.classic)}
+            >
+              <Text style={styles.leaderboardButtonText}>Ver clasificación</Text>
+            </Pressable>
+          </Animated.View>
+        )}
 
         {/* Footer */}
         <Animated.View
@@ -317,6 +366,66 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: 'rgba(245, 215, 110, 0.7)',
     letterSpacing: 1.5,
+  },
+  gameCenterSection: {
+    marginTop: 24,
+    gap: 12,
+  },
+  friendsBlock: {
+    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+    borderRadius: 14,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.06)',
+  },
+  friendsTitle: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: 'rgba(255, 255, 255, 0.4)',
+    marginBottom: 10,
+    textTransform: 'uppercase',
+    letterSpacing: 1.5,
+  },
+  friendRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 4,
+    gap: 8,
+  },
+  friendRank: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: 'rgba(255, 255, 255, 0.35)',
+    width: 18,
+  },
+  friendName: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: '600',
+    color: 'rgba(255, 255, 255, 0.8)',
+  },
+  friendScore: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#8CE6CD',
+  },
+  leaderboardButton: {
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 12,
+    backgroundColor: 'rgba(140, 230, 205, 0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(140, 230, 205, 0.25)',
+    alignSelf: 'center',
+  },
+  leaderboardPressed: {
+    opacity: 0.85,
+  },
+  leaderboardButtonText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#8CE6CD',
+    letterSpacing: 0.5,
   },
   footer: {
     alignItems: 'center',

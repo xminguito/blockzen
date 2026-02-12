@@ -1,0 +1,7 @@
+{
+  "platforms": ["ios"],
+  "ios": {
+    "modules": ["ExpoGameCenterModule"],
+    "podspecPath": "./ios/ExpoGameCenter.podspec"
+  }
+}
