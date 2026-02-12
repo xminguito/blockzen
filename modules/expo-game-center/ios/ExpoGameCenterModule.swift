@@ -154,7 +154,7 @@ public class ExpoGameCenterModule: Module {
           return
         }
 
-        board.loadEntries(for: .friends, timeScope: .allTime, range: NSRange(location: 1, length: 25)) { local, entries, totalCount, loadError in
+        board.loadEntries(for: .friendsOnly, timeScope: .allTime, range: NSRange(location: 1, length: 25)) { local, entries, totalCount, loadError in
           DispatchQueue.main.async {
             if let loadError = loadError {
               promise.reject(self?.errorCodeUnavailable ?? "E_GAMECENTER_UNAVAILABLE",
@@ -164,8 +164,8 @@ public class ExpoGameCenterModule: Module {
 
             let items = (entries ?? []).map { entry -> [String: Any] in
               [
-                "rank": entry.rank,
-                "score": entry.score,
+                "rank": Int(entry.rank),
+                "score": Int(truncatingIfNeeded: entry.score),
                 "playerId": entry.player.gamePlayerID,
                 "alias": entry.player.alias,
                 "formattedScore": entry.formattedScore
