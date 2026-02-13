@@ -5,6 +5,7 @@ import UIKit
 public class ExpoGameCenterModule: Module {
   private let errorCodeUnavailable = "E_GAMECENTER_UNAVAILABLE"
   private let errorCodeUserCancelled = "E_GAMECENTER_USER_CANCELLED"
+  private var gameCenterDelegateRetainer: GameCenterDelegate?
 
   public func definition() -> ModuleDefinition {
     Name("ExpoGameCenter")
@@ -69,6 +70,8 @@ public class ExpoGameCenterModule: Module {
       return
     }
 
+    let errCancelled = errorCodeUserCancelled
+    let errUnavailable = errorCodeUnavailable
     localPlayer.authenticateHandler = { [weak self] viewController, error in
       DispatchQueue.main.async {
         if let vc = viewController {
@@ -77,15 +80,12 @@ public class ExpoGameCenterModule: Module {
           let errMsg = error.localizedDescription.lowercased()
           if error.domain == GKError.errorDomain {
             if error.code == 9 || errMsg.contains("cancel") || errMsg.contains("denied") {
-              promise.reject(self?.errorCodeUserCancelled ?? "E_GAMECENTER_USER_CANCELLED",
-                "User cancelled Game Center sign-in")
+              promise.reject(errCancelled, "User cancelled Game Center sign-in")
             } else {
-              promise.reject(self?.errorCodeUnavailable ?? "E_GAMECENTER_UNAVAILABLE",
-                error.localizedDescription)
+              promise.reject(errUnavailable, error.localizedDescription)
             }
           } else {
-            promise.reject(self?.errorCodeUnavailable ?? "E_GAMECENTER_UNAVAILABLE",
-              error.localizedDescription)
+            promise.reject(errUnavailable, error.localizedDescription)
           }
         } else if localPlayer.isAuthenticated {
           let result: [String: Any] = [
@@ -94,8 +94,7 @@ public class ExpoGameCenterModule: Module {
           ]
           promise.resolve(result)
         } else {
-          promise.reject(self?.errorCodeUnavailable ?? "E_GAMECENTER_UNAVAILABLE",
-            "Game Center authentication could not be completed")
+          promise.reject(errUnavailable, "Game Center authentication could not be completed")
         }
       }
     }
@@ -113,7 +112,7 @@ public class ExpoGameCenterModule: Module {
 
     if #available(iOS 14.0, *) {
       GKLeaderboard.submitScore(
-        score,
+        Int(score),
         context: 0,
         player: GKLocalPlayer.local,
         leaderboardIDs: [leaderboardId]
@@ -141,10 +140,11 @@ public class ExpoGameCenterModule: Module {
       return
     }
 
-    GKLeaderboard.loadLeaderboards(IDs: [leaderboardId]) { [weak self] leaderboards, error in
+    let errUnavailable = errorCodeUnavailable
+    GKLeaderboard.loadLeaderboards(IDs: [leaderboardId]) { leaderboards, error in
       DispatchQueue.main.async {
         if let error = error {
-          promise.reject(self?.errorCodeUnavailable ?? "E_GAMECENTER_UNAVAILABLE",
+          promise.reject(errUnavailable,
             error.localizedDescription)
           return
         }
@@ -154,10 +154,10 @@ public class ExpoGameCenterModule: Module {
           return
         }
 
-        board.loadEntries(for: .friends, timeScope: .allTime, range: NSRange(location: 1, length: 25)) { local, entries, totalCount, loadError in
+        board.loadEntries(for: .friendsOnly, timeScope: .allTime, range: NSRange(location: 1, length: 25)) { local, entries, totalCount, loadError in
           DispatchQueue.main.async {
             if let loadError = loadError {
-              promise.reject(self?.errorCodeUnavailable ?? "E_GAMECENTER_UNAVAILABLE",
+              promise.reject(errUnavailable,
                 loadError.localizedDescription)
               return
             }
@@ -193,12 +193,18 @@ public class ExpoGameCenterModule: Module {
       return
     }
 
-    let vc = GKGameCenterViewController(state: .leaderboards)
-    vc.gameCenterDelegate = GameCenterDelegate(promise: promise)
-
-    if let lid = leaderboardId, !lid.isEmpty {
-      vc.leaderboardIdentifier = lid
+    let delegate = GameCenterDelegate(promise: promise) { [weak self] in
+      self?.gameCenterDelegateRetainer = nil
     }
+    gameCenterDelegateRetainer = delegate
+
+    let vc: GKGameCenterViewController
+    if let lid = leaderboardId, !lid.isEmpty {
+      vc = GKGameCenterViewController(leaderboardID: lid, playerScope: .global, timeScope: .allTime)
+    } else {
+      vc = GKGameCenterViewController(state: .leaderboards)
+    }
+    vc.gameCenterDelegate = delegate
 
     top.present(vc, animated: true)
   }
@@ -208,13 +214,16 @@ public class ExpoGameCenterModule: Module {
 
 private class GameCenterDelegate: NSObject, GKGameCenterControllerDelegate {
   let promise: Promise
+  let onDismiss: (() -> Void)?
 
-  init(promise: Promise) {
+  init(promise: Promise, onDismiss: (() -> Void)? = nil) {
     self.promise = promise
+    self.onDismiss = onDismiss
   }
 
   func gameCenterViewControllerDidFinish(_ gameCenterViewController: GKGameCenterViewController) {
     gameCenterViewController.dismiss(animated: true)
     promise.resolve(nil)
+    onDismiss?()
   }
 }
