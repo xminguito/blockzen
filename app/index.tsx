@@ -13,6 +13,8 @@ import {
   Pressable,
   SafeAreaView,
   Platform,
+  Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import Animated, {
@@ -122,8 +124,45 @@ export default function HomeScreen() {
     isAuthenticated,
     friendsScores,
     fetchFriendsScores,
+    authenticate,
     presentDashboard,
+    isAvailable,
   } = useGameCenter();
+  const [authInProgress, setAuthInProgress] = useState(false);
+
+  const handleGameCenterPress = async () => {
+    if (isAuthenticated) {
+      try {
+        await presentDashboard(LEADERBOARD_IDS.classic);
+      } catch (e) {
+        Alert.alert('Game Center', `Error: ${(e as Error).message}`);
+      }
+      return;
+    }
+    if (!isAvailable) {
+      Alert.alert(
+        'Game Center no disponible',
+        'El módulo nativo no está cargado. Vuelve a compilar la app con: npx expo run:ios --device'
+      );
+      return;
+    }
+    setAuthInProgress(true);
+    try {
+      const ok = await authenticate();
+      if (ok) {
+        Alert.alert('Game Center', 'Sesión iniciada correctamente.');
+      } else {
+        Alert.alert(
+          'Game Center',
+          'No se pudo conectar. ¿Estás logueado en Ajustes > Game Center?'
+        );
+      }
+    } catch (e) {
+      Alert.alert('Game Center', `Error: ${(e as Error).message}`);
+    } finally {
+      setAuthInProgress(false);
+    }
+  };
 
   const today = new Date().getDate();
 
@@ -206,37 +245,62 @@ export default function HomeScreen() {
           </Animated.View>
         </View>
 
-        {/* Game Center: Amigos a batir + Ver clasificación (iOS) */}
-        {Platform.OS === 'ios' && isAuthenticated && (
+        {/* Game Center (iOS): sign-in + leaderboard */}
+        {Platform.OS === 'ios' && (
           <Animated.View
             style={styles.gameCenterSection}
             entering={FadeInUp.delay(400).springify()}
           >
-            {friendsScores.length > 0 && (
-              <View style={styles.friendsBlock}>
-                <Text style={styles.friendsTitle}>Amigos a batir</Text>
-                {friendsScores.slice(0, 5).map((entry, i) => (
-                  <View key={entry.playerId} style={styles.friendRow}>
-                    <Text style={styles.friendRank}>{i + 1}.</Text>
-                    <Text style={styles.friendName} numberOfLines={1}>
-                      {entry.alias ?? entry.playerId}
-                    </Text>
-                    <Text style={styles.friendScore}>
-                      {entry.score.toLocaleString()}
-                    </Text>
+            {!isAuthenticated ? (
+              <Pressable
+                style={({ pressed }) => [
+                  styles.leaderboardButton,
+                  pressed && styles.leaderboardPressed,
+                ]}
+                onPress={handleGameCenterPress}
+                hitSlop={12}
+                disabled={authInProgress}
+              >
+                {authInProgress ? (
+                  <ActivityIndicator size="small" color="#8CE6CD" />
+                ) : (
+                  <Text style={styles.leaderboardButtonText}>
+                    Iniciar sesión en Game Center
+                  </Text>
+                )}
+              </Pressable>
+            ) : (
+              <>
+                {friendsScores.length > 0 && (
+                  <View style={styles.friendsBlock}>
+                    <Text style={styles.friendsTitle}>Amigos a batir</Text>
+                    {friendsScores.slice(0, 5).map((entry, i) => (
+                      <View key={entry.playerId} style={styles.friendRow}>
+                        <Text style={styles.friendRank}>{i + 1}.</Text>
+                        <Text style={styles.friendName} numberOfLines={1}>
+                          {entry.alias ?? entry.playerId}
+                        </Text>
+                        <Text style={styles.friendScore}>
+                          {entry.score.toLocaleString()}
+                        </Text>
+                      </View>
+                    ))}
                   </View>
-                ))}
-              </View>
+                )}
+                <Pressable
+                  style={({ pressed }) => [
+                    styles.leaderboardButton,
+                    pressed && styles.leaderboardPressed,
+                  ]}
+                  onPress={handleGameCenterPress}
+                  hitSlop={12}
+                >
+                  <Text style={styles.leaderboardButtonText}>
+                    Ver clasificación
+                  </Text>
+                </Pressable>
+              </>
             )}
-            <Pressable
-              style={({ pressed }) => [
-                styles.leaderboardButton,
-                pressed && styles.leaderboardPressed,
-              ]}
-              onPress={() => presentDashboard(LEADERBOARD_IDS.classic)}
-            >
-              <Text style={styles.leaderboardButtonText}>Ver clasificación</Text>
-            </Pressable>
           </Animated.View>
         )}
 
@@ -262,7 +326,7 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   safe: {
     flex: 1,
-    backgroundColor: '#0B0B1E',
+    backgroundColor: '#0f2725f5',
   },
   container: {
     flex: 1,

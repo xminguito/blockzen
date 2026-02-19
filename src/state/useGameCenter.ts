@@ -5,12 +5,14 @@
  * - submitScore: fire-and-forget, never blocks UI
  * - fetchFriendsScores: on-demand, run after interactions
  * - presentDashboard: opens native GKGameCenterViewController
+ * - nextRival: friend with score immediately above user (for "ofensa competitiva")
+ * - sendVengeanceChallenge: sends score challenge to a friend
  */
 
 import { useCallback, useEffect, useState } from 'react';
 import { InteractionManager, Platform } from 'react-native';
 import * as ExpoGameCenter from 'expo-game-center';
-import type { FriendScore, GameCenterPlayer } from 'expo-game-center';
+import type { FriendScore } from 'expo-game-center';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // TYPES
@@ -21,7 +23,18 @@ export interface UseGameCenterReturn {
   playerId: string | null;
   alias: string | null;
   isLoading: boolean;
+  isAvailable: boolean;
   friendsScores: FriendScore[];
+  /** Friend with score immediately above userScore (next rival to beat) */
+  nextRival: (userScore: number) => FriendScore | null;
+  /** Send score challenge to friend — opens native challenge compose UI */
+  sendVengeanceChallenge: (
+    friendId: string,
+    score: number,
+    leaderboardId: string,
+    message?: string
+  ) => Promise<void>;
+  authenticate: () => Promise<boolean>;
   submitScore: (score: number, leaderboardId: string) => void;
   fetchFriendsScores: (leaderboardId: string) => void;
   presentDashboard: (leaderboardId?: string) => Promise<void>;
@@ -58,6 +71,21 @@ export function useGameCenter(): UseGameCenterReturn {
       });
   }, []);
 
+  const authenticate = useCallback(async (): Promise<boolean> => {
+    if (Platform.OS !== 'ios') return false;
+    try {
+      const player = await ExpoGameCenter.authenticate();
+      if (player) {
+        setPlayerId(player.playerId);
+        setAlias(player.alias);
+        return true;
+      }
+      return false;
+    } catch {
+      return false;
+    }
+  }, []);
+
   const submitScore = useCallback((score: number, leaderboardId: string) => {
     ExpoGameCenter.submitScore(score, leaderboardId);
   }, []);
@@ -74,12 +102,43 @@ export function useGameCenter(): UseGameCenterReturn {
     return ExpoGameCenter.presentDashboard(leaderboardId);
   }, []);
 
+  const sendVengeanceChallenge = useCallback(
+    async (
+      friendId: string,
+      score: number,
+      leaderboardId: string,
+      message?: string
+    ) => {
+      return ExpoGameCenter.sendVengeanceChallenge(
+        friendId,
+        score,
+        leaderboardId,
+        message
+      );
+    },
+    []
+  );
+
+  /** Rival = friend with the smallest score greater than userScore (immediately above) */
+  const nextRival = useCallback(
+    (userScore: number): FriendScore | null => {
+      const above = friendsScores.filter((f) => f.score > userScore);
+      if (above.length === 0) return null;
+      return above.sort((a, b) => a.score - b.score)[0];
+    },
+    [friendsScores]
+  );
+
   return {
     isAuthenticated: !!playerId,
     playerId,
     alias,
     isLoading,
+    isAvailable: ExpoGameCenter.isAvailable?.() ?? false,
     friendsScores,
+    nextRival,
+    sendVengeanceChallenge,
+    authenticate,
     submitScore,
     fetchFriendsScores,
     presentDashboard,

@@ -291,7 +291,7 @@ export default function DailyScreen() {
 const styles = StyleSheet.create({
   safe: {
     flex: 1,
-    backgroundColor: '#0B0B1E',
+    backgroundColor: '#0f2725f5',
   },
   container: {
     flex: 1,

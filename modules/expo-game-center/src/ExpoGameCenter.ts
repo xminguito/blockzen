@@ -36,6 +36,12 @@ let NativeModule: {
   submitScore: (score: number, leaderboardId: string) => Promise<void>;
   fetchFriendsScores: (leaderboardId: string) => Promise<FriendScore[]>;
   presentDashboard: (leaderboardId?: string) => Promise<void>;
+  sendVengeanceChallenge: (
+    friendId: string,
+    score: number,
+    leaderboardId: string,
+    message?: string | null
+  ) => Promise<void>;
 } | null = null;
 
 function getModule() {
@@ -94,6 +100,21 @@ export async function presentDashboard(leaderboardId?: string): Promise<void> {
   const mod = getModule();
   if (!mod) return;
   return mod.presentDashboard(leaderboardId ?? undefined);
+}
+
+/**
+ * Send a score challenge to a friend ("vengeance" / "ofensa competitiva").
+ * Presents the native challenge compose UI.
+ */
+export async function sendVengeanceChallenge(
+  friendId: string,
+  score: number,
+  leaderboardId: string,
+  message?: string | null
+): Promise<void> {
+  const mod = getModule();
+  if (!mod) return;
+  return mod.sendVengeanceChallenge(friendId, score, leaderboardId, message ?? undefined);
 }
 
 /**
