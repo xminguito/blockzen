@@ -55,6 +55,8 @@
     "vengeance": "You surpassed {{alias}}!",
     "send_challenge": "Challenge {{alias}}",
     "challenge_friends": "Challenge Friends",
+    "share_victory": "Share Victory!",
+    "friends_surpassed": "You surpassed {{count}} friend(s) today!",
     "play_again": "Play Again",
     "view_board": "View Board",
     "leaderboard": "View Leaderboard",

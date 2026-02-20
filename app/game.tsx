@@ -205,6 +205,7 @@ export default function GameScreen() {
     fetchFriendsScores,
     isAuthenticated,
     isAvailable: isGameCenterAvailable,
+    friendsScores,
   } = useGameCenter();
   const [settingsVisible, setSettingsVisible] = useState(false);
 
@@ -528,6 +529,7 @@ export default function GameScreen() {
             ? () => issueChallenge(game.score, LEADERBOARD_IDS.classic)
             : undefined
         }
+        friendsSurpassedCount={friendsScores.filter((f) => f.score < game.score).length}
       />
 
       {/* Settings Modal */}

@@ -118,6 +118,7 @@ export default function DailyScreen() {
     presentDashboard,
     issueChallenge,
     isAvailable: isGameCenterAvailable,
+    friendsScores,
   } = useGameCenter();
   const [settingsVisible, setSettingsVisible] = useState(false);
 
@@ -322,6 +323,7 @@ export default function DailyScreen() {
             ? () => issueChallenge(game.score, LEADERBOARD_IDS.daily)
             : undefined
         }
+        friendsSurpassedCount={friendsScores.filter((f) => f.score < game.score).length}
       />
 
       {/* Settings Modal */}

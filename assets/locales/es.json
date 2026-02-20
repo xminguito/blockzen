@@ -55,6 +55,8 @@
     "vengeance": "¡Has superado a {{alias}}!",
     "send_challenge": "Desafiar a {{alias}}",
     "challenge_friends": "Desafiar Amigos",
+    "share_victory": "¡Compartir Victoria!",
+    "friends_surpassed": "¡Has superado a {{count}} amigo(s) hoy!",
     "play_again": "Jugar de Nuevo",
     "view_board": "Ver Tablero",
     "leaderboard": "Ver clasificación",

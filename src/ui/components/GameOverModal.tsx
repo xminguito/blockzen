@@ -5,7 +5,7 @@
  * and buttons to restart or return home.
  */
 
-import React from 'react';
+import React, { useCallback, useEffect } from 'react';
 import {
   View,
   Text,
@@ -17,8 +17,16 @@ import Animated, {
   FadeIn,
   FadeOut,
   SlideInDown,
+  useSharedValue,
+  useAnimatedStyle,
+  withDelay,
+  withSpring,
+  withRepeat,
+  withTiming,
 } from 'react-native-reanimated';
 import { BlurView } from 'expo-blur';
+import { LinearGradient } from 'expo-linear-gradient';
+import * as Haptics from 'expo-haptics';
 import { useTranslation } from 'react-i18next';
 
 import { formatScore } from '../../core/formatters';
@@ -44,7 +52,15 @@ export interface GameOverModalProps {
   onSendChallenge?: () => void;
   /** Open Apple's native friend picker to challenge anyone — shown on new high score */
   onIssueChallenge?: () => void;
+  /** Number of friends whose score the user beat this game */
+  friendsSurpassedCount?: number;
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// SPRING CONFIG (matches BlockTray.tsx pattern)
+// ═══════════════════════════════════════════════════════════════════════════
+
+const BUTTON_SPRING = { damping: 10, stiffness: 120, mass: 0.7 };
 
 // ═══════════════════════════════════════════════════════════════════════════
 // COMPONENT
@@ -63,10 +79,50 @@ export function GameOverModal({
   rivalDefeated,
   onSendChallenge,
   onIssueChallenge,
+  friendsSurpassedCount,
 }: GameOverModalProps) {
   const { t, i18n } = useTranslation();
 
+  // ── Spring entrance for vengeanceButton (400ms after modal appears) ──
+  const buttonScale = useSharedValue(0);
+
+  // ── Shimmer for golden buttons ──
+  const shimmerX = useSharedValue(-120);
+
+  useEffect(() => {
+    if (!visible) {
+      buttonScale.value = 0;
+      return;
+    }
+    buttonScale.value = withDelay(400, withSpring(1, BUTTON_SPRING));
+  }, [visible]);
+
+  useEffect(() => {
+    shimmerX.value = withRepeat(withTiming(300, { duration: 2200 }), -1, false);
+  }, []);
+
+  const vengeanceButtonAnimStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: buttonScale.value }],
+  }));
+
+  const shimmerStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: shimmerX.value }],
+  }));
+
+  // ── Haptic handlers ──
+  const handleSendChallenge = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    onSendChallenge?.();
+  }, [onSendChallenge]);
+
+  const handleIssueChallenge = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    onIssueChallenge?.();
+  }, [onIssueChallenge]);
+
   if (!visible) return null;
+
+  const showFriendsSurpassed = (friendsSurpassedCount ?? 0) > 0;
 
   return (
     <Animated.View
@@ -102,17 +158,26 @@ export function GameOverModal({
           {/* Challenge Friends — only on new high score, only if Game Center is wired */}
           {isNewHighScore && onIssueChallenge != null && (
             <Pressable
-              style={styles.challengeFriendsButton}
-              onPress={onIssueChallenge}
+              style={[styles.challengeFriendsButton]}
+              onPress={handleIssueChallenge}
               accessibilityRole="button"
-              accessibilityLabel={t('game_over.challenge_friends')}
+              accessibilityLabel={t(isNewHighScore ? 'game_over.share_victory' : 'game_over.challenge_friends')}
             >
+              {/* Shimmer overlay */}
+              <Animated.View style={[styles.shimmerOverlay, shimmerStyle]} pointerEvents="none">
+                <LinearGradient
+                  colors={['transparent', 'rgba(255,255,255,0.22)', 'transparent']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={StyleSheet.absoluteFill}
+                />
+              </Animated.View>
               <Text
                 style={styles.challengeFriendsText}
                 numberOfLines={1}
                 adjustsFontSizeToFit
               >
-                {'⚔️  '}{t('game_over.challenge_friends')}
+                {'⚔️  '}{t(isNewHighScore ? 'game_over.share_victory' : 'game_over.challenge_friends')}
               </Text>
             </Pressable>
           )}
@@ -136,26 +201,44 @@ export function GameOverModal({
             </View>
           </View>
 
+          {/* Social context — friends surpassed this game */}
+          {showFriendsSurpassed && (
+            <Text style={styles.socialContextText}>
+              {t('game_over.friends_surpassed', { count: friendsSurpassedCount })}
+            </Text>
+          )}
+
           {/* Rival Defeated — Vengeance challenge */}
           {rivalDefeated != null && onSendChallenge != null && (
             <View style={styles.vengeanceSection}>
               <Text style={styles.vengeanceText}>
                 {t('game_over.vengeance', { alias: rivalDefeated.alias })}
               </Text>
-              <Pressable
-                style={[styles.button, styles.vengeanceButton]}
-                onPress={onSendChallenge}
-                accessibilityRole="button"
-                accessibilityLabel={t('a11y.send_challenge_to', { alias: rivalDefeated.alias })}
-              >
-                <Text
-                  style={styles.vengeanceButtonText}
-                  numberOfLines={1}
-                  adjustsFontSizeToFit
+              <Animated.View style={[{ width: '100%' }, vengeanceButtonAnimStyle]}>
+                <Pressable
+                  style={[styles.button, styles.vengeanceButton]}
+                  onPress={handleSendChallenge}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('a11y.send_challenge_to', { alias: rivalDefeated.alias })}
                 >
-                  {t('game_over.send_challenge', { alias: rivalDefeated.alias })}
-                </Text>
-              </Pressable>
+                  {/* Shimmer overlay */}
+                  <Animated.View style={[styles.shimmerOverlay, shimmerStyle]} pointerEvents="none">
+                    <LinearGradient
+                      colors={['transparent', 'rgba(255,255,255,0.22)', 'transparent']}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 0 }}
+                      style={StyleSheet.absoluteFill}
+                    />
+                  </Animated.View>
+                  <Text
+                    style={styles.vengeanceButtonText}
+                    numberOfLines={1}
+                    adjustsFontSizeToFit
+                  >
+                    {t('game_over.send_challenge', { alias: rivalDefeated.alias })}
+                  </Text>
+                </Pressable>
+              </Animated.View>
             </View>
           )}
 
@@ -294,6 +377,14 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     letterSpacing: 1,
   },
+  socialContextText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: 'rgba(255, 215, 0, 0.75)',
+    marginBottom: 12,
+    letterSpacing: 0.3,
+    textAlign: 'center',
+  },
   actions: {
     width: '100%',
     gap: 10,
@@ -303,6 +394,7 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     borderRadius: 14,
     alignItems: 'center',
+    overflow: 'hidden',
   },
   primaryButton: {
     backgroundColor: 'rgba(140, 230, 205, 0.2)',
@@ -371,11 +463,18 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255, 215, 0, 0.45)',
     backgroundColor: 'transparent',
     alignItems: 'center',
+    overflow: 'hidden',
   },
   challengeFriendsText: {
     fontSize: 14,
     fontWeight: '600',
     color: 'rgba(255, 215, 0, 0.85)',
     letterSpacing: 0.5,
+  },
+  shimmerOverlay: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    width: 80,
   },
 });
