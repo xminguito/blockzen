@@ -12,6 +12,7 @@ import {
   StyleSheet,
   Pressable,
   Dimensions,
+  Platform,
 } from 'react-native';
 import Animated, {
   FadeIn,
@@ -30,6 +31,17 @@ import * as Haptics from 'expo-haptics';
 import { useTranslation } from 'react-i18next';
 
 import { formatScore } from '../../core/formatters';
+
+// ═══════════════════════════════════════════════════════════════════════════
+// CONSTANTS
+// ═══════════════════════════════════════════════════════════════════════════
+
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+
+const BUTTON_SPRING = { damping: 10, stiffness: 120, mass: 0.7 };
+
+/** 4-stop metallic gold palette — simulates brushed metal highlight */
+const GOLD_GRADIENT = ['#FDB931', '#F7941E', '#FDB931', '#E87C1E'] as const;
 
 // ═══════════════════════════════════════════════════════════════════════════
 // PROPS
@@ -57,12 +69,6 @@ export interface GameOverModalProps {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// SPRING CONFIG (matches BlockTray.tsx pattern)
-// ═══════════════════════════════════════════════════════════════════════════
-
-const BUTTON_SPRING = { damping: 10, stiffness: 120, mass: 0.7 };
-
-// ═══════════════════════════════════════════════════════════════════════════
 // COMPONENT
 // ═══════════════════════════════════════════════════════════════════════════
 
@@ -83,11 +89,11 @@ export function GameOverModal({
 }: GameOverModalProps) {
   const { t, i18n } = useTranslation();
 
-  // ── Spring entrance for vengeanceButton (400ms after modal appears) ──
+  // ── Spring entrance: vengeanceButton pops in 400ms after modal ──
   const buttonScale = useSharedValue(0);
 
-  // ── Shimmer for golden buttons ──
-  const shimmerX = useSharedValue(-120);
+  // ── Diagonal shimmer ray across golden buttons (3s loop) ──
+  const shimmerX = useSharedValue(-140);
 
   useEffect(() => {
     if (!visible) {
@@ -98,7 +104,11 @@ export function GameOverModal({
   }, [visible]);
 
   useEffect(() => {
-    shimmerX.value = withRepeat(withTiming(300, { duration: 2200 }), -1, false);
+    shimmerX.value = withRepeat(
+      withTiming(SCREEN_WIDTH, { duration: 3000 }),
+      -1,
+      false,
+    );
   }, []);
 
   const vengeanceButtonAnimStyle = useAnimatedStyle(() => ({
@@ -109,7 +119,7 @@ export function GameOverModal({
     transform: [{ translateX: shimmerX.value }],
   }));
 
-  // ── Haptic handlers ──
+  // ── Haptic handlers — fire before native action ──
   const handleSendChallenge = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     onSendChallenge?.();
@@ -145,11 +155,7 @@ export function GameOverModal({
           {/* New High Score Badge */}
           {isNewHighScore && (
             <View style={styles.badge}>
-              <Text
-                style={styles.badgeText}
-                numberOfLines={1}
-                adjustsFontSizeToFit
-              >
+              <Text style={styles.badgeText} numberOfLines={1} adjustsFontSizeToFit>
                 {t('game_over.new_high_score')}
               </Text>
             </View>
@@ -157,29 +163,36 @@ export function GameOverModal({
 
           {/* Challenge Friends — only on new high score, only if Game Center is wired */}
           {isNewHighScore && onIssueChallenge != null && (
-            <Pressable
-              style={[styles.challengeFriendsButton]}
-              onPress={handleIssueChallenge}
-              accessibilityRole="button"
-              accessibilityLabel={t(isNewHighScore ? 'game_over.share_victory' : 'game_over.challenge_friends')}
-            >
-              {/* Shimmer overlay */}
-              <Animated.View style={[styles.shimmerOverlay, shimmerStyle]} pointerEvents="none">
+            <View style={styles.goldButtonGlow}>
+              <Pressable
+                style={styles.challengeFriendsButton}
+                onPress={handleIssueChallenge}
+                accessibilityRole="button"
+                accessibilityLabel={t('game_over.share_victory')}
+              >
                 <LinearGradient
-                  colors={['transparent', 'rgba(255,255,255,0.22)', 'transparent']}
+                  colors={GOLD_GRADIENT}
                   start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 0 }}
+                  end={{ x: 0, y: 1 }}
                   style={StyleSheet.absoluteFill}
                 />
-              </Animated.View>
-              <Text
-                style={styles.challengeFriendsText}
-                numberOfLines={1}
-                adjustsFontSizeToFit
-              >
-                {'⚔️  '}{t(isNewHighScore ? 'game_over.share_victory' : 'game_over.challenge_friends')}
-              </Text>
-            </Pressable>
+                <Animated.View
+                  style={[styles.shimmerRay, shimmerStyle]}
+                  pointerEvents="none"
+                >
+                  <LinearGradient
+                    colors={['transparent', 'rgba(255,255,255,0.30)', 'transparent']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 0 }}
+                    style={StyleSheet.absoluteFill}
+                  />
+                </Animated.View>
+                <Text style={styles.challengeFriendsText} numberOfLines={1} adjustsFontSizeToFit>
+                  <Text style={styles.buttonIcon}>⚔️  </Text>
+                  {t('game_over.share_victory')}
+                </Text>
+              </Pressable>
+            </View>
           )}
 
           {/* Score */}
@@ -208,33 +221,51 @@ export function GameOverModal({
             </Text>
           )}
 
-          {/* Rival Defeated — Vengeance challenge */}
+          {/* Rival Defeated — Vengeance challenge (Gold Trophy button) */}
           {rivalDefeated != null && onSendChallenge != null && (
             <View style={styles.vengeanceSection}>
               <Text style={styles.vengeanceText}>
                 {t('game_over.vengeance', { alias: rivalDefeated.alias })}
               </Text>
-              <Animated.View style={[{ width: '100%' }, vengeanceButtonAnimStyle]}>
+
+              {/*
+               * Two-layer structure:
+               * 1. Outer Animated.View  — carries spring scale + iOS glow shadow (no overflow:hidden)
+               * 2. Inner Pressable      — clips the shimmer ray (overflow:hidden)
+               */}
+              <Animated.View style={[styles.goldButtonGlow, vengeanceButtonAnimStyle]}>
                 <Pressable
-                  style={[styles.button, styles.vengeanceButton]}
+                  style={styles.vengeanceButtonInner}
                   onPress={handleSendChallenge}
                   accessibilityRole="button"
                   accessibilityLabel={t('a11y.send_challenge_to', { alias: rivalDefeated.alias })}
                 >
-                  {/* Shimmer overlay */}
-                  <Animated.View style={[styles.shimmerOverlay, shimmerStyle]} pointerEvents="none">
+                  {/* Metallic gradient fill */}
+                  <LinearGradient
+                    colors={GOLD_GRADIENT}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 0, y: 1 }}
+                    style={StyleSheet.absoluteFill}
+                  />
+                  {/* Diagonal shimmer ray */}
+                  <Animated.View
+                    style={[styles.shimmerRay, shimmerStyle]}
+                    pointerEvents="none"
+                  >
                     <LinearGradient
-                      colors={['transparent', 'rgba(255,255,255,0.22)', 'transparent']}
+                      colors={['transparent', 'rgba(255,255,255,0.30)', 'transparent']}
                       start={{ x: 0, y: 0 }}
                       end={{ x: 1, y: 0 }}
                       style={StyleSheet.absoluteFill}
                     />
                   </Animated.View>
+                  {/* Label — icon 20% brighter than text */}
                   <Text
                     style={styles.vengeanceButtonText}
                     numberOfLines={1}
                     adjustsFontSizeToFit
                   >
+                    <Text style={styles.buttonIcon}>⚔️  </Text>
                     {t('game_over.send_challenge', { alias: rivalDefeated.alias })}
                   </Text>
                 </Pressable>
@@ -297,8 +328,6 @@ export function GameOverModal({
 // ═══════════════════════════════════════════════════════════════════════════
 // STYLES
 // ═══════════════════════════════════════════════════════════════════════════
-
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 const styles = StyleSheet.create({
   overlay: {
@@ -429,10 +458,10 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     paddingVertical: 12,
     paddingHorizontal: 16,
-    backgroundColor: 'rgba(255, 215, 0, 0.08)',
+    backgroundColor: 'rgba(255, 215, 0, 0.06)',
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: 'rgba(255, 215, 0, 0.2)',
+    borderColor: 'rgba(255, 215, 0, 0.18)',
   },
   vengeanceText: {
     fontSize: 15,
@@ -441,40 +470,75 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     letterSpacing: 0.5,
   },
-  vengeanceButton: {
+
+  // ── Gold Trophy button — outer glow wrapper (no overflow:hidden so shadow renders) ──
+  goldButtonGlow: {
     width: '100%',
-    backgroundColor: 'rgba(255, 215, 0, 0.15)',
+    borderRadius: 14,
+    // iOS glow
+    ...Platform.select({
+      ios: {
+        shadowColor: '#F7941E',
+        shadowOffset: { width: 0, height: 0 },
+        shadowOpacity: 0.8,
+        shadowRadius: 10,
+      },
+      android: {
+        elevation: 8,
+      },
+    }),
+  },
+
+  // ── Gold Trophy button — inner clip container ──
+  vengeanceButtonInner: {
+    width: '100%',
+    paddingVertical: 16,
+    borderRadius: 14,
+    alignItems: 'center',
+    overflow: 'hidden',
     borderWidth: 1,
-    borderColor: 'rgba(255, 215, 0, 0.35)',
+    borderColor: '#FFD700',
   },
-  vengeanceButtonText: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: '#FFD700',
-    letterSpacing: 0.5,
-  },
+
+  // ── Challenge Friends button (same metallic treatment, compact) ──
   challengeFriendsButton: {
+    width: '100%',
     marginTop: 8,
     marginBottom: 4,
     paddingVertical: 10,
     paddingHorizontal: 20,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: 'rgba(255, 215, 0, 0.45)',
-    backgroundColor: 'transparent',
+    borderColor: '#FFD700',
     alignItems: 'center',
     overflow: 'hidden',
   },
   challengeFriendsText: {
     fontSize: 14,
-    fontWeight: '600',
-    color: 'rgba(255, 215, 0, 0.85)',
+    fontWeight: '700',
+    color: '#4A2800',
     letterSpacing: 0.5,
   },
-  shimmerOverlay: {
+
+  // ── Shared label styles ──
+  vengeanceButtonText: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#4A2800',
+    letterSpacing: 0.6,
+  },
+  /** Icon rendered ~20% brighter than surrounding text via near-white gold tint */
+  buttonIcon: {
+    color: '#FFFDE0',
+  },
+
+  // ── Diagonal shimmer ray (skewed strip traversing button left→right) ──
+  shimmerRay: {
     position: 'absolute',
-    top: 0,
-    bottom: 0,
-    width: 80,
+    top: -20,
+    bottom: -20,
+    width: 60,
+    transform: [{ skewX: '-20deg' }],
+    opacity: 0.9,
   },
 });
