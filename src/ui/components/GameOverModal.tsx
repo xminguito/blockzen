@@ -19,6 +19,9 @@ import Animated, {
   SlideInDown,
 } from 'react-native-reanimated';
 import { BlurView } from 'expo-blur';
+import { useTranslation } from 'react-i18next';
+
+import { formatScore } from '../../core/formatters';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // PROPS
@@ -58,6 +61,8 @@ export function GameOverModal({
   rivalDefeated,
   onSendChallenge,
 }: GameOverModalProps) {
+  const { t, i18n } = useTranslation();
+
   if (!visible) return null;
 
   return (
@@ -75,32 +80,32 @@ export function GameOverModal({
         >
           {/* Header */}
           <Text style={styles.title}>
-            {mode === 'daily' ? 'Daily Complete' : 'Game Over'}
+            {mode === 'daily' ? t('game_over.daily_title') : t('game_over.title')}
           </Text>
 
           {/* New High Score Badge */}
           {isNewHighScore && (
             <View style={styles.badge}>
-              <Text style={styles.badgeText}>NEW HIGH SCORE!</Text>
+              <Text style={styles.badgeText}>{t('game_over.new_high_score')}</Text>
             </View>
           )}
 
           {/* Score */}
-          <Text style={styles.scoreLabel}>Score</Text>
-          <Text style={styles.scoreValue}>{score.toLocaleString()}</Text>
+          <Text style={styles.scoreLabel}>{t('game_over.score_label')}</Text>
+          <Text style={styles.scoreValue}>{formatScore(score, i18n.language)}</Text>
 
           {/* Stats Row */}
           <View style={styles.statsRow}>
             <View style={styles.stat}>
               <Text style={styles.statValue}>{linesCleared}</Text>
-              <Text style={styles.statLabel}>Lines</Text>
+              <Text style={styles.statLabel}>{t('game_over.lines_label')}</Text>
             </View>
             <View style={styles.statDivider} />
             <View style={styles.stat}>
               <Text style={styles.statValue}>
-                {highScore.toLocaleString()}
+                {formatScore(highScore, i18n.language)}
               </Text>
-              <Text style={styles.statLabel}>Best</Text>
+              <Text style={styles.statLabel}>{t('game_over.best_label')}</Text>
             </View>
           </View>
 
@@ -108,14 +113,14 @@ export function GameOverModal({
           {rivalDefeated != null && onSendChallenge != null && (
             <View style={styles.vengeanceSection}>
               <Text style={styles.vengeanceText}>
-                Has superado a {rivalDefeated.alias}!
+                {t('game_over.vengeance', { alias: rivalDefeated.alias })}
               </Text>
               <Pressable
                 style={[styles.button, styles.vengeanceButton]}
                 onPress={onSendChallenge}
               >
                 <Text style={styles.vengeanceButtonText}>
-                  Enviar Desafio a {rivalDefeated.alias}
+                  {t('game_over.send_challenge', { alias: rivalDefeated.alias })}
                 </Text>
               </Pressable>
             </View>
@@ -128,7 +133,7 @@ export function GameOverModal({
               onPress={onRestart}
             >
               <Text style={styles.buttonText}>
-                {mode === 'daily' ? 'View Board' : 'Play Again'}
+                {mode === 'daily' ? t('game_over.view_board') : t('game_over.play_again')}
               </Text>
             </Pressable>
 
@@ -138,7 +143,7 @@ export function GameOverModal({
                 onPress={onShowLeaderboard}
               >
                 <Text style={[styles.buttonText, styles.leaderboardText]}>
-                  Ver clasificación
+                  {t('game_over.leaderboard')}
                 </Text>
               </Pressable>
             )}
@@ -148,7 +153,7 @@ export function GameOverModal({
               onPress={onHome}
             >
               <Text style={[styles.buttonText, styles.secondaryText]}>
-                Home
+                {t('game_over.home')}
               </Text>
             </Pressable>
           </View>

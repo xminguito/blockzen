@@ -8,6 +8,8 @@
  * - Stack navigator with transparent headers
  */
 
+import '../src/core/i18n';
+
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';

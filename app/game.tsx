@@ -35,12 +35,14 @@ import Animated, {
   Easing,
   runOnJS,
 } from 'react-native-reanimated';
+import { useTranslation } from 'react-i18next';
 
 import { useGame, triggerHaptic } from '../src/state/useGame';
 import { useHighScore } from '../src/state/useHighScore';
 import { useSettings } from '../src/state/useSettings';
 import { useGameCenter } from '../src/state/useGameCenter';
 import { LEADERBOARD_IDS } from '../src/core/constants';
+import { formatScore } from '../src/core/formatters';
 import { Board, computeBoardGeometry, BOARD_PADDING, INNER_PAD } from '../src/ui/components/Board';
 import { ParticleCanvas } from '../src/ui/components/ParticleCanvas';
 import type { ParticleCanvasHandle } from '../src/ui/components/ParticleCanvas';
@@ -75,14 +77,14 @@ function getComboColor(level: number): string {
 // ANIMATED SCORE — rolls up smoothly with scale bump
 // ═══════════════════════════════════════════════════════════════════════════
 
-function AnimatedScore({ score }: { score: number }) {
+function AnimatedScore({ score, language }: { score: number; language: string }) {
   const displayValue = useSharedValue(0);
   const scaleValue = useSharedValue(1);
   const [displayText, setDisplayText] = useState('0');
 
   const updateText = useCallback((val: number) => {
-    setDisplayText(Math.round(val).toLocaleString());
-  }, []);
+    setDisplayText(formatScore(Math.round(val), language));
+  }, [language]);
 
   useEffect(() => {
     displayValue.value = withTiming(score, {
@@ -183,6 +185,7 @@ function BoardComboOverlay({
 
 export default function GameScreen() {
   const router = useRouter();
+  const { t, i18n } = useTranslation();
   const insets = useSafeAreaInsets();
   const { width: screenWidth } = useWindowDimensions();
   const { boardSize, cellSize, gap } = computeBoardGeometry(screenWidth);
@@ -252,13 +255,13 @@ export default function GameScreen() {
     prevScoreRef.current = game.score;
   }, [game.score]);
 
-  // Track combo changes for board overlay — timer managed via ref, NOT useEffect cleanup
+          // Track combo changes for board overlay — timer managed via ref, NOT useEffect cleanup
   useEffect(() => {
     if (game.comboLabel && game.combo >= 2) {
       comboIdRef.current += 1;
       const delta = game.score - prevScoreRef.current;
       setComboOverlay({
-        label: game.comboLabel,
+        label: t(game.comboLabel),
         level: game.combo,
         points: delta > 0 ? delta : game.score,
         id: comboIdRef.current,
@@ -377,7 +380,7 @@ export default function GameScreen() {
         {/* Top bar: Home + Gear (posición original) */}
         <View style={styles.topBar}>
           <Pressable onPress={() => router.back()} style={styles.backButton}>
-            <Text style={styles.backText}>{'<'} Home</Text>
+            <Text style={styles.backText}>{t('game.back')}</Text>
           </Pressable>
           <Pressable
             onPress={() => setSettingsVisible(true)}
@@ -392,13 +395,13 @@ export default function GameScreen() {
         <View style={styles.gameArea}>
           <View style={styles.hud}>
             <View style={styles.scoreSection}>
-              <Text style={styles.scoreLabel}>S C O R E</Text>
-              <AnimatedScore score={game.score} />
+              <Text style={styles.scoreLabel}>{t('game.score')}</Text>
+              <AnimatedScore score={game.score} language={i18n.language} />
             </View>
             <View style={styles.hudRight}>
-              <Text style={styles.bestLabel}>BEST</Text>
+              <Text style={styles.bestLabel}>{t('game.best')}</Text>
               <Text style={styles.bestValue}>
-                {Math.max(highScore, game.score).toLocaleString()}
+                {formatScore(Math.max(highScore, game.score), i18n.language)}
               </Text>
             </View>
           </View>
@@ -446,7 +449,7 @@ export default function GameScreen() {
               entering={FadeInUp.springify()}
               exiting={FadeOut.duration(250)}
             >
-              +{floatingPoints.points.toLocaleString()}
+              +{formatScore(floatingPoints.points, i18n.language)}
             </Animated.Text>
           )}
 
@@ -461,7 +464,7 @@ export default function GameScreen() {
             >
               <View style={styles.vengeanceGlow} />
               <Text style={styles.vengeanceText}>
-                Has superado a {vengeanceOverlay.alias}!
+                {t('game.vengeance', { alias: vengeanceOverlay.alias })}
               </Text>
             </Animated.View>
           )}
@@ -482,7 +485,7 @@ export default function GameScreen() {
         {/* Stats Bar */}
         <View style={styles.statsBar}>
           <Text style={styles.statText}>
-            Lines: {game.linesCleared}
+            {t('game.lines', { count: game.linesCleared })}
           </Text>
         </View>
       </Animated.View>
@@ -506,7 +509,7 @@ export default function GameScreen() {
                   rivalDefeatedRef.current!.playerId,
                   game.score,
                   LEADERBOARD_IDS.classic,
-                  'Te he superado en BlockZen!',
+                  t('game.challenge_message'),
                 );
               }
             : undefined

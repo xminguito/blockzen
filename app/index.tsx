@@ -22,11 +22,13 @@ import Animated, {
   FadeInDown,
   FadeInUp,
 } from 'react-native-reanimated';
+import { useTranslation } from 'react-i18next';
 
 import { readHighScore } from '../src/state/useHighScore';
 import { useDaily } from '../src/state/useDaily';
 import { useGameCenter } from '../src/state/useGameCenter';
 import { LEADERBOARD_IDS } from '../src/core/constants';
+import { formatScore } from '../src/core/formatters';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // MINI BLOCK PREVIEW — decorative colored squares for cards
@@ -119,6 +121,7 @@ const miniStyles = StyleSheet.create({
 
 export default function HomeScreen() {
   const router = useRouter();
+  const { t, i18n } = useTranslation();
   const [classicHigh, setClassicHigh] = useState(0);
   const { dailySeedLabel, hasPlayedToday, todayScore, isLoading } = useDaily();
   const {
@@ -142,8 +145,8 @@ export default function HomeScreen() {
     }
     if (!isAvailable) {
       Alert.alert(
-        'Game Center no disponible',
-        'El módulo nativo no está cargado. Vuelve a compilar la app con: npx expo run:ios --device'
+        t('home.game_center.unavailable_title'),
+        t('home.game_center.unavailable_message'),
       );
       return;
     }
@@ -151,12 +154,9 @@ export default function HomeScreen() {
     try {
       const ok = await authenticate();
       if (ok) {
-        Alert.alert('Game Center', 'Sesión iniciada correctamente.');
+        Alert.alert('Game Center', t('home.game_center.success'));
       } else {
-        Alert.alert(
-          'Game Center',
-          'No se pudo conectar. ¿Estás logueado en Ajustes > Game Center?'
-        );
+        Alert.alert('Game Center', t('home.game_center.error'));
       }
     } catch (e) {
       Alert.alert('Game Center', `Error: ${(e as Error).message}`);
@@ -192,7 +192,7 @@ export default function HomeScreen() {
         >
           <Text style={styles.title}>BLOCK</Text>
           <Text style={styles.titleAccent}>ZEN</Text>
-          <Text style={styles.subtitle}>Premium Block Puzzle</Text>
+          <Text style={styles.subtitle}>{t('app.subtitle')}</Text>
         </Animated.View>
 
         {/* Mode Buttons */}
@@ -208,13 +208,13 @@ export default function HomeScreen() {
               onPress={() => router.push('/game')}
             >
               <MiniBoard />
-              <Text style={styles.modeTitle}>Classic</Text>
+              <Text style={styles.modeTitle}>{t('home.classic.title')}</Text>
               <Text style={styles.modeDesc}>
-                Endless puzzle. Beat your best score.
+                {t('home.classic.description')}
               </Text>
               {classicHigh > 0 && (
                 <Text style={styles.modeHighScore}>
-                  Best: {classicHigh.toLocaleString()}
+                  {t('home.classic.best', { score: formatScore(classicHigh, i18n.language) })}
                 </Text>
               )}
             </Pressable>
@@ -232,19 +232,19 @@ export default function HomeScreen() {
               onPress={() => router.push('/daily')}
             >
               <DailyIcon day={today} />
-              <Text style={styles.modeTitle}>Daily Challenge</Text>
+              <Text style={styles.modeTitle}>{t('home.daily.title')}</Text>
               <Text style={styles.modeDesc}>
-                Same pieces for everyone. One attempt.
+                {t('home.daily.description')}
               </Text>
               <Text style={styles.modeSeed}>{dailySeedLabel}</Text>
               {hasPlayedToday && (
                 <Text style={styles.modeHighScore}>
-                  Today: {todayScore.toLocaleString()}
+                  {t('home.daily.today', { score: formatScore(todayScore, i18n.language) })}
                 </Text>
               )}
               {hasPlayedToday && (
                 <View style={styles.playedBadge}>
-                  <Text style={styles.playedBadgeText}>COMPLETED</Text>
+                  <Text style={styles.playedBadgeText}>{t('home.daily.completed')}</Text>
                 </View>
               )}
             </Pressable>
@@ -271,7 +271,7 @@ export default function HomeScreen() {
                   <ActivityIndicator size="small" color="#8CE6CD" />
                 ) : (
                   <Text style={styles.leaderboardButtonText}>
-                    Iniciar sesión en Game Center
+                    {t('home.game_center.sign_in')}
                   </Text>
                 )}
               </Pressable>
@@ -279,7 +279,7 @@ export default function HomeScreen() {
               <>
                 {friendsScores.length > 0 && (
                   <View style={styles.friendsBlock}>
-                    <Text style={styles.friendsTitle}>Amigos a batir</Text>
+                    <Text style={styles.friendsTitle}>{t('home.friends.title')}</Text>
                     {friendsScores.slice(0, 5).map((entry, i) => (
                       <View key={entry.playerId} style={styles.friendRow}>
                         <Text style={styles.friendRank}>{i + 1}.</Text>
@@ -287,7 +287,7 @@ export default function HomeScreen() {
                           {entry.alias ?? entry.playerId}
                         </Text>
                         <Text style={styles.friendScore}>
-                          {entry.score.toLocaleString()}
+                          {formatScore(entry.score, i18n.language)}
                         </Text>
                       </View>
                     ))}
@@ -302,7 +302,7 @@ export default function HomeScreen() {
                   hitSlop={12}
                 >
                   <Text style={styles.leaderboardButtonText}>
-                    Ver clasificación
+                    {t('home.game_center.leaderboard')}
                   </Text>
                 </Pressable>
               </>
@@ -315,10 +315,8 @@ export default function HomeScreen() {
           style={styles.footer}
           entering={FadeInUp.delay(500).springify()}
         >
-          <Text style={styles.footerText}>
-            Tap a mode to begin
-          </Text>
-          <Text style={styles.versionText}>v1.0</Text>
+          <Text style={styles.footerText}>{t('app.footer')}</Text>
+          <Text style={styles.versionText}>{t('app.version')}</Text>
         </Animated.View>
       </ScrollView>
     </SafeAreaView>

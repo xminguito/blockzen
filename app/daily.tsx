@@ -31,8 +31,10 @@ import Animated, {
   Easing,
   runOnJS,
 } from 'react-native-reanimated';
+import { useTranslation } from 'react-i18next';
 
 import { useGame } from '../src/state/useGame';
+import { formatScore } from '../src/core/formatters';
 import { useHighScore } from '../src/state/useHighScore';
 import { useDaily } from '../src/state/useDaily';
 import { useSettings } from '../src/state/useSettings';
@@ -48,14 +50,14 @@ import { SettingsModal } from '../src/ui/components/SettingsModal';
 // ANIMATED SCORE
 // ═══════════════════════════════════════════════════════════════════════════
 
-function AnimatedDailyScore({ score }: { score: number }) {
+function AnimatedDailyScore({ score, language }: { score: number; language: string }) {
   const displayValue = useSharedValue(0);
   const scaleValue = useSharedValue(1);
   const [displayText, setDisplayText] = useState('0');
 
   const updateText = useCallback((val: number) => {
-    setDisplayText(Math.round(val).toLocaleString());
-  }, []);
+    setDisplayText(formatScore(Math.round(val), language));
+  }, [language]);
 
   useEffect(() => {
     displayValue.value = withTiming(score, {
@@ -92,6 +94,7 @@ function AnimatedDailyScore({ score }: { score: number }) {
 
 export default function DailyScreen() {
   const router = useRouter();
+  const { t, i18n } = useTranslation();
   const insets = useSafeAreaInsets();
   const { width: screenWidth } = useWindowDimensions();
   const { boardSize, cellSize, gap } = computeBoardGeometry(screenWidth);
@@ -159,22 +162,22 @@ export default function DailyScreen() {
     return (
       <View style={styles.safe}>
         <View style={[styles.playedContainer, safePadding]}>
-          <Text style={styles.playedTitle}>Daily Complete</Text>
+          <Text style={styles.playedTitle}>{t('game.already_played.title')}</Text>
           <Text style={styles.playedSeed}>{dailySeedLabel}</Text>
-          <Text style={styles.playedLabel}>Your Score</Text>
+          <Text style={styles.playedLabel}>{t('game.already_played.score_label')}</Text>
           <Text style={styles.playedScore}>
             {game.score > 0
-              ? game.score.toLocaleString()
-              : 'Played today'}
+              ? formatScore(game.score, i18n.language)
+              : t('game.already_played.played_today')}
           </Text>
           <Text style={styles.playedHint}>
-            Come back tomorrow for a new challenge
+            {t('game.already_played.hint')}
           </Text>
           <Pressable
             style={styles.homeButton}
             onPress={() => router.replace('/')}
           >
-            <Text style={styles.homeButtonText}>Home</Text>
+            <Text style={styles.homeButtonText}>{t('game.already_played.home')}</Text>
           </Pressable>
         </View>
       </View>
@@ -185,7 +188,7 @@ export default function DailyScreen() {
     return (
       <View style={styles.safe}>
         <View style={[styles.playedContainer, safePadding]}>
-          <Text style={styles.playedHint}>Loading...</Text>
+          <Text style={styles.playedHint}>{t('game.loading')}</Text>
         </View>
       </View>
     );
@@ -200,7 +203,7 @@ export default function DailyScreen() {
         {/* Top bar: Home + Gear (posición original) */}
         <View style={styles.topBar}>
           <Pressable onPress={() => router.back()} style={styles.backButton}>
-            <Text style={styles.backText}>{'<'} Home</Text>
+            <Text style={styles.backText}>{t('game.back')}</Text>
           </Pressable>
           <Pressable
             onPress={() => setSettingsVisible(true)}
@@ -215,12 +218,12 @@ export default function DailyScreen() {
         <View style={styles.gameArea}>
           <View style={styles.hud}>
             <View style={styles.centerHud}>
-              <Text style={styles.dailyBadge}>DAILY</Text>
+              <Text style={styles.dailyBadge}>{t('game.daily_badge')}</Text>
               <Text style={styles.dailySeed}>{dailySeedLabel}</Text>
             </View>
             <View style={styles.scoreSection}>
-              <Text style={styles.scoreLabel}>SCORE</Text>
-              <AnimatedDailyScore score={game.score} />
+              <Text style={styles.scoreLabel}>{t('game.score')}</Text>
+              <AnimatedDailyScore score={game.score} language={i18n.language} />
             </View>
           </View>
 

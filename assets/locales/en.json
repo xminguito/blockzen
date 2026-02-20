@@ -1,0 +1,80 @@
+{
+  "app": {
+    "subtitle": "Premium Block Puzzle",
+    "footer": "Tap a mode to begin",
+    "version": "v1.0"
+  },
+  "home": {
+    "classic": {
+      "title": "Classic",
+      "description": "Endless puzzle. Beat your best score.",
+      "best": "Best: {{score}}"
+    },
+    "daily": {
+      "title": "Daily Challenge",
+      "description": "Same pieces for everyone. One attempt.",
+      "completed": "COMPLETED",
+      "today": "Today: {{score}}"
+    },
+    "friends": {
+      "title": "FRIENDS TO BEAT"
+    },
+    "game_center": {
+      "sign_in": "Sign in to Game Center",
+      "leaderboard": "View Leaderboard",
+      "unavailable_title": "Game Center unavailable",
+      "unavailable_message": "The native module is not loaded. Rebuild the app with: npx expo run:ios --device",
+      "success": "Signed in successfully.",
+      "error": "Could not connect. Are you logged in to Settings > Game Center?"
+    }
+  },
+  "game": {
+    "back": "< Home",
+    "score": "S C O R E",
+    "best": "BEST",
+    "lines": "Lines: {{count}}",
+    "daily_badge": "DAILY",
+    "vengeance": "You surpassed {{alias}}!",
+    "challenge_message": "I beat you in BlockZen!",
+    "loading": "Loading...",
+    "already_played": {
+      "title": "Daily Complete",
+      "score_label": "Your Score",
+      "played_today": "Played today",
+      "hint": "Come back tomorrow for a new challenge",
+      "home": "Home"
+    }
+  },
+  "game_over": {
+    "title": "Game Over",
+    "daily_title": "Daily Complete",
+    "new_high_score": "NEW HIGH SCORE!",
+    "score_label": "Score",
+    "lines_label": "Lines",
+    "best_label": "Best",
+    "vengeance": "You surpassed {{alias}}!",
+    "send_challenge": "Challenge {{alias}}",
+    "play_again": "Play Again",
+    "view_board": "View Board",
+    "leaderboard": "View Leaderboard",
+    "home": "Home"
+  },
+  "settings": {
+    "title": "Settings",
+    "sound": "Sound",
+    "vibration": "Vibration",
+    "replay": "Replay",
+    "play": "Play",
+    "home": "Home",
+    "go": "Go"
+  },
+  "combo": {
+    "good": "Good!",
+    "great": "Great!",
+    "excellent": "Excellent!",
+    "amazing": "Amazing!",
+    "incredible": "Incredible!",
+    "unbelievable": "Unbelievable!",
+    "godlike": "GODLIKE!"
+  }
+}

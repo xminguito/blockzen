@@ -1,0 +1,80 @@
+{
+  "app": {
+    "subtitle": "Puzzle de Bloques Premium",
+    "footer": "Toca un modo para empezar",
+    "version": "v1.0"
+  },
+  "home": {
+    "classic": {
+      "title": "Clásico",
+      "description": "Puzzle sin fin. Supera tu mejor puntuación.",
+      "best": "Mejor: {{score}}"
+    },
+    "daily": {
+      "title": "Desafío Diario",
+      "description": "Mismas piezas para todos. Un solo intento.",
+      "completed": "COMPLETADO",
+      "today": "Hoy: {{score}}"
+    },
+    "friends": {
+      "title": "AMIGOS A BATIR"
+    },
+    "game_center": {
+      "sign_in": "Iniciar sesión en Game Center",
+      "leaderboard": "Ver clasificación",
+      "unavailable_title": "Game Center no disponible",
+      "unavailable_message": "El módulo nativo no está cargado. Vuelve a compilar la app con: npx expo run:ios --device",
+      "success": "Sesión iniciada correctamente.",
+      "error": "No se pudo conectar. ¿Estás logueado en Ajustes > Game Center?"
+    }
+  },
+  "game": {
+    "back": "< Inicio",
+    "score": "P U N T O S",
+    "best": "MEJOR",
+    "lines": "Líneas: {{count}}",
+    "daily_badge": "DIARIO",
+    "vengeance": "¡Has superado a {{alias}}!",
+    "challenge_message": "¡Te he superado en BlockZen!",
+    "loading": "Cargando...",
+    "already_played": {
+      "title": "Diario Completado",
+      "score_label": "Tu Puntuación",
+      "played_today": "Jugado hoy",
+      "hint": "Vuelve mañana para un nuevo desafío",
+      "home": "Inicio"
+    }
+  },
+  "game_over": {
+    "title": "Fin del Juego",
+    "daily_title": "Diario Completado",
+    "new_high_score": "¡NUEVA PUNTUACIÓN MÁXIMA!",
+    "score_label": "Puntuación",
+    "lines_label": "Líneas",
+    "best_label": "Mejor",
+    "vengeance": "¡Has superado a {{alias}}!",
+    "send_challenge": "Desafiar a {{alias}}",
+    "play_again": "Jugar de Nuevo",
+    "view_board": "Ver Tablero",
+    "leaderboard": "Ver clasificación",
+    "home": "Inicio"
+  },
+  "settings": {
+    "title": "Ajustes",
+    "sound": "Sonido",
+    "vibration": "Vibración",
+    "replay": "Reiniciar",
+    "play": "Jugar",
+    "home": "Inicio",
+    "go": "Ir"
+  },
+  "combo": {
+    "good": "¡Bien!",
+    "great": "¡Genial!",
+    "excellent": "¡Excelente!",
+    "amazing": "¡Increíble!",
+    "incredible": "¡Impresionante!",
+    "unbelievable": "¡Alucinante!",
+    "godlike": "¡DIVINO!"
+  }
+}

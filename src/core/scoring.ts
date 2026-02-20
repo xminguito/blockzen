@@ -92,15 +92,16 @@ export function getNextCombo(
 }
 
 /**
- * Get a human-readable combo label for UI display (Block Blast style).
+ * Returns an i18n translation key for the combo level (Block Blast style).
+ * Components call t(key) — the engine stays pure with no i18n dependency.
  */
 export function getComboLabel(combo: number): string | null {
   if (combo < 2) return null;
-  if (combo === 2) return 'Good!';
-  if (combo === 3) return 'Great!';
-  if (combo === 4) return 'Excellent!';
-  if (combo === 5) return 'Amazing!';
-  if (combo === 6) return 'Incredible!';
-  if (combo <= 9) return 'Unbelievable!';
-  return 'GODLIKE!';
+  if (combo === 2) return 'combo.good';
+  if (combo === 3) return 'combo.great';
+  if (combo === 4) return 'combo.excellent';
+  if (combo === 5) return 'combo.amazing';
+  if (combo === 6) return 'combo.incredible';
+  if (combo <= 9) return 'combo.unbelievable';
+  return 'combo.godlike';
 }

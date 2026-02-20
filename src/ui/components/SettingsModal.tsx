@@ -21,6 +21,7 @@ import Animated, {
   ZoomIn,
 } from 'react-native-reanimated';
 import { BlurView } from 'expo-blur';
+import { useTranslation } from 'react-i18next';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // PROPS
@@ -147,6 +148,8 @@ export function SettingsModal({
   onHome,
   onClose,
 }: SettingsModalProps) {
+  const { t } = useTranslation();
+
   if (!visible) return null;
 
   return (
@@ -167,7 +170,7 @@ export function SettingsModal({
           <Pressable style={styles.card} onPress={() => {}}>
             {/* Header */}
             <View style={styles.header}>
-              <Text style={styles.title}>Settings</Text>
+              <Text style={styles.title}>{t('settings.title')}</Text>
               <Pressable
                 style={({ pressed }) => [
                   styles.closeButton,
@@ -186,7 +189,7 @@ export function SettingsModal({
             {/* Toggle rows */}
             <ToggleRow
               icon={<SoundIcon />}
-              label="Sound"
+              label={t('settings.sound')}
               value={soundEnabled}
               onToggle={onToggleSound}
             />
@@ -195,7 +198,7 @@ export function SettingsModal({
 
             <ToggleRow
               icon={<VibrationIcon />}
-              label="Vibration"
+              label={t('settings.vibration')}
               value={vibrationEnabled}
               onToggle={onToggleVibration}
             />
@@ -205,8 +208,8 @@ export function SettingsModal({
             {/* Action rows */}
             <ActionRow
               icon={<RestartIcon />}
-              label="Replay"
-              buttonLabel="Play"
+              label={t('settings.replay')}
+              buttonLabel={t('settings.play')}
               onPress={() => {
                 onClose();
                 onRestart();
@@ -218,8 +221,8 @@ export function SettingsModal({
 
             <ActionRow
               icon={<HomeIcon />}
-              label="Home"
-              buttonLabel="Go"
+              label={t('settings.home')}
+              buttonLabel={t('settings.go')}
               onPress={() => {
                 onClose();
                 onHome();
