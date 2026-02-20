@@ -15,9 +15,9 @@
  */
 
 import React, { useMemo } from 'react';
-import { View, StyleSheet, useWindowDimensions } from 'react-native';
-import { Canvas, RoundedRect, Group } from '@shopify/react-native-skia';
-import { useDerivedValue } from 'react-native-reanimated';
+import { View, Text, StyleSheet, useWindowDimensions } from 'react-native';
+import { Canvas, RoundedRect, Group, Circle } from '@shopify/react-native-skia';
+import Animated, { useDerivedValue, useAnimatedStyle } from 'react-native-reanimated';
 import type { SharedValue } from 'react-native-reanimated';
 
 import { PALETTE } from '../shaders/PatternShaders';
@@ -85,6 +85,9 @@ export interface BoardProps {
   ghostColorId: SharedValue<number>;
   ghostValid: SharedValue<number>;
   patternsEnabled?: boolean;
+  rivalScore?: SharedValue<number>;
+  currentScore?: SharedValue<number>;
+  rivalAlias?: string;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -97,12 +100,14 @@ export function Board({
   ghostGrid,
   ghostColorId,
   ghostValid,
+  rivalScore,
+  currentScore,
+  rivalAlias,
 }: BoardProps) {
   const { width: screenWidth } = useWindowDimensions();
 
   const geometry = useMemo(() => {
     const containerSize = screenWidth - BOARD_PADDING * 2;
-    // Cell area is inset by INNER_PAD on each side
     const gridArea = containerSize - INNER_PAD * 2;
     const cellSize = (gridArea - (GRID_SIZE - 1) * GAP) / GRID_SIZE;
     const cornerRadius = cellSize * 0.22;
@@ -111,6 +116,7 @@ export function Board({
   }, [screenWidth]);
 
   const { containerSize, cellSize, cornerRadius, stride } = geometry;
+  const hasRival = rivalScore != null && currentScore != null;
 
   return (
     <View style={[styles.container, { width: containerSize, height: containerSize }]}>
@@ -131,7 +137,22 @@ export function Board({
             ghostValid={ghostValid}
           />
         ))}
+        {hasRival && (
+          <RivalGhostMarker
+            rivalScore={rivalScore}
+            currentScore={currentScore}
+            containerSize={containerSize}
+          />
+        )}
       </Canvas>
+      {hasRival && rivalAlias != null && (
+        <RivalAliasLabel
+          rivalScore={rivalScore}
+          currentScore={currentScore}
+          containerSize={containerSize}
+          alias={rivalAlias}
+        />
+      )}
     </View>
   );
 }
@@ -258,6 +279,119 @@ function CellNode({
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
+// RIVAL GHOST MARKER — Skia indicator on right edge of board
+// ═══════════════════════════════════════════════════════════════════════════
+
+const RIVAL_DASH_COUNT = 4;
+const RIVAL_DASH_W = 7;
+const RIVAL_DASH_GAP = 5;
+const RIVAL_DOT_R = 4.5;
+
+interface RivalGhostMarkerProps {
+  rivalScore: SharedValue<number>;
+  currentScore: SharedValue<number>;
+  containerSize: number;
+}
+
+function RivalGhostMarker({
+  rivalScore,
+  currentScore,
+  containerSize,
+}: RivalGhostMarkerProps) {
+  const gridArea = containerSize - INNER_PAD * 2;
+  const dotCX = containerSize - INNER_PAD - RIVAL_DOT_R - 1;
+
+  const dotCY = useDerivedValue(() => {
+    if (rivalScore.value <= 0) return -100;
+    const progress = Math.min(1, currentScore.value / rivalScore.value);
+    const raw = INNER_PAD + gridArea * (1 - progress);
+    return Math.max(INNER_PAD + RIVAL_DOT_R, Math.min(INNER_PAD + gridArea - RIVAL_DOT_R, raw));
+  });
+
+  const dashY = useDerivedValue(() => {
+    if (rivalScore.value <= 0) return -100;
+    const progress = Math.min(1, currentScore.value / rivalScore.value);
+    const raw = INNER_PAD + gridArea * (1 - progress);
+    return Math.max(INNER_PAD + RIVAL_DOT_R, Math.min(INNER_PAD + gridArea - RIVAL_DOT_R, raw)) - 0.75;
+  });
+
+  const dotColor = useDerivedValue(() => {
+    if (rivalScore.value <= 0) return 'transparent';
+    const progress = Math.min(1, currentScore.value / rivalScore.value);
+    const alpha = progress > 0.8 ? 0.65 : 0.35;
+    return `rgba(255, 215, 0, ${alpha})`;
+  });
+
+  const lineColor = useDerivedValue(() => {
+    if (rivalScore.value <= 0) return 'transparent';
+    const progress = Math.min(1, currentScore.value / rivalScore.value);
+    const alpha = progress > 0.8 ? 0.4 : 0.18;
+    return `rgba(255, 215, 0, ${alpha})`;
+  });
+
+  return (
+    <Group>
+      <Circle cx={dotCX} cy={dotCY} r={RIVAL_DOT_R} color={dotColor} />
+      {Array.from({ length: RIVAL_DASH_COUNT }, (_, i) => (
+        <RoundedRect
+          key={`rd${i}`}
+          x={dotCX - RIVAL_DOT_R - 4 - i * (RIVAL_DASH_W + RIVAL_DASH_GAP)}
+          y={dashY}
+          width={RIVAL_DASH_W}
+          height={1.5}
+          r={0.75}
+          color={lineColor}
+        />
+      ))}
+    </Group>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// RIVAL ALIAS LABEL — RN overlay showing rival initial on board right edge
+// ═══════════════════════════════════════════════════════════════════════════
+
+interface RivalAliasLabelProps {
+  rivalScore: SharedValue<number>;
+  currentScore: SharedValue<number>;
+  containerSize: number;
+  alias: string;
+}
+
+function RivalAliasLabel({
+  rivalScore,
+  currentScore,
+  containerSize,
+  alias,
+}: RivalAliasLabelProps) {
+  const gridArea = containerSize - INNER_PAD * 2;
+  const labelSize = 18;
+
+  const animatedStyle = useAnimatedStyle(() => {
+    if (rivalScore.value <= 0) {
+      return { opacity: 0, transform: [{ translateY: -100 }] };
+    }
+    const progress = Math.min(1, currentScore.value / rivalScore.value);
+    const raw = INNER_PAD + gridArea * (1 - progress);
+    const clamped = Math.max(INNER_PAD + RIVAL_DOT_R, Math.min(INNER_PAD + gridArea - RIVAL_DOT_R, raw));
+    const opacity = progress > 0.8 ? 0.9 : 0.6;
+    return {
+      opacity,
+      transform: [{ translateY: clamped - labelSize / 2 }],
+    };
+  });
+
+  return (
+    <Animated.View
+      style={[styles.rivalLabel, { width: labelSize, height: labelSize, borderRadius: labelSize / 2 }, animatedStyle]}
+      pointerEvents="none"
+    >
+      <Text style={styles.rivalLabelText}>{alias.charAt(0).toUpperCase()}</Text>
+    </Animated.View>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
 // STYLES
 // ═══════════════════════════════════════════════════════════════════════════
 
@@ -268,6 +402,21 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(18, 16, 32, 0.95)',
     borderWidth: 1.5,
     borderColor: 'rgba(255, 255, 255, 0.06)',
+  },
+  rivalLabel: {
+    position: 'absolute',
+    right: 2,
+    top: 0,
+    backgroundColor: 'rgba(255, 215, 0, 0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 215, 0, 0.25)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  rivalLabelText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: 'rgba(255, 215, 0, 0.8)',
   },
 });
 

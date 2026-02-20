@@ -36,16 +36,18 @@ import Animated, {
   runOnJS,
 } from 'react-native-reanimated';
 
-import { useGame } from '../src/state/useGame';
+import { useGame, triggerHaptic } from '../src/state/useGame';
 import { useHighScore } from '../src/state/useHighScore';
 import { useSettings } from '../src/state/useSettings';
 import { useGameCenter } from '../src/state/useGameCenter';
 import { LEADERBOARD_IDS } from '../src/core/constants';
 import { Board, computeBoardGeometry, BOARD_PADDING, INNER_PAD } from '../src/ui/components/Board';
 import { ParticleCanvas } from '../src/ui/components/ParticleCanvas';
+import type { ParticleCanvasHandle } from '../src/ui/components/ParticleCanvas';
 import { BlockTray } from '../src/ui/components/BlockTray';
 import { GameOverModal } from '../src/ui/components/GameOverModal';
 import { SettingsModal } from '../src/ui/components/SettingsModal';
+import type { FriendScore } from 'expo-game-center';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // CONSTANTS
@@ -191,8 +193,30 @@ export default function GameScreen() {
   const game = useGame('classic');
   const { highScore, isNewHighScore, submitScore } = useHighScore('classic');
   const { settings, toggleSound, toggleVibration } = useSettings();
-  const { submitScore: submitToGameCenter, presentDashboard } = useGameCenter();
+  const {
+    submitScore: submitToGameCenter,
+    presentDashboard,
+    nextRival,
+    sendVengeanceChallenge,
+    fetchFriendsScores,
+    isAuthenticated,
+  } = useGameCenter();
   const [settingsVisible, setSettingsVisible] = useState(false);
+
+  // ── Vengeance system ──
+  const particleRef = useRef<ParticleCanvasHandle>(null);
+  const rival = nextRival(highScore);
+  const rivalDefeatedRef = useRef<FriendScore | null>(null);
+  const vengeanceIdRef = useRef(0);
+  const vengeanceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [vengeanceOverlay, setVengeanceOverlay] = useState<{
+    alias: string;
+    id: number;
+  } | null>(null);
+
+  const currentScoreSV = useSharedValue(0);
+  const rivalScoreSV = useSharedValue(rival?.score ?? 0);
+  const vengeanceFired = useSharedValue(0);
 
   // Floating points state
   const [floatingPoints, setFloatingPoints] = useState<{
@@ -247,6 +271,60 @@ export default function GameScreen() {
     }
     // NO cleanup return — timer lives independently of effect re-runs
   }, [game.comboLabel, game.combo, game.score]);
+
+  // ── Vengeance: fetch friends scores, sync SharedValues, detect surpass ──
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      fetchFriendsScores(LEADERBOARD_IDS.classic);
+    }
+  }, [isAuthenticated, fetchFriendsScores]);
+
+  useEffect(() => {
+    currentScoreSV.value = game.score;
+  }, [game.score, currentScoreSV]);
+
+  useEffect(() => {
+    rivalScoreSV.value = rival?.score ?? 0;
+  }, [rival, rivalScoreSV]);
+
+  const fireVengeanceBurst = useCallback(() => {
+    particleRef.current?.spawnVengeanceBurst();
+    triggerHaptic('combo');
+    setTimeout(() => triggerHaptic('clear'), 200);
+
+    if (rival) {
+      rivalDefeatedRef.current = rival;
+      vengeanceIdRef.current += 1;
+      setVengeanceOverlay({ alias: rival.alias, id: vengeanceIdRef.current });
+      if (vengeanceTimerRef.current) clearTimeout(vengeanceTimerRef.current);
+      vengeanceTimerRef.current = setTimeout(() => {
+        setVengeanceOverlay(null);
+        vengeanceTimerRef.current = null;
+      }, 2000);
+    }
+  }, [rival]);
+
+  useAnimatedReaction(
+    () => ({
+      current: currentScoreSV.value,
+      rival: rivalScoreSV.value,
+      fired: vengeanceFired.value,
+    }),
+    (data) => {
+      if (data.rival > 0 && data.current >= data.rival && data.fired === 0) {
+        vengeanceFired.value = 1;
+        runOnJS(fireVengeanceBurst)();
+      }
+    },
+  );
+
+  const handleRestart = useCallback(() => {
+    vengeanceFired.value = 0;
+    rivalDefeatedRef.current = null;
+    setVengeanceOverlay(null);
+    game.restart();
+  }, [vengeanceFired, game]);
 
   // Submit score when game ends (local + Game Center fire-and-forget)
   const prevGameOver = useRef(false);
@@ -337,8 +415,12 @@ export default function GameScreen() {
             ghostGrid={game.ghostGrid}
             ghostColorId={game.ghostColorId}
             ghostValid={game.ghostValid}
+            rivalScore={rivalScoreSV}
+            currentScore={currentScoreSV}
+            rivalAlias={rival?.alias}
           />
           <ParticleCanvas
+            ref={particleRef}
             clearingCells={game.clearingCells}
             gridDisplay={game.gridDisplay}
             boardSize={boardSize}
@@ -366,6 +448,22 @@ export default function GameScreen() {
             >
               +{floatingPoints.points.toLocaleString()}
             </Animated.Text>
+          )}
+
+          {/* Vengeance burst overlay */}
+          {vengeanceOverlay && (
+            <Animated.View
+              key={vengeanceOverlay.id}
+              style={styles.vengeanceOverlay}
+              entering={ZoomIn.springify().damping(10).stiffness(150)}
+              exiting={FadeOut.duration(400)}
+              pointerEvents="none"
+            >
+              <View style={styles.vengeanceGlow} />
+              <Text style={styles.vengeanceText}>
+                Has superado a {vengeanceOverlay.alias}!
+              </Text>
+            </Animated.View>
           )}
         </View>
         </View>
@@ -397,9 +495,22 @@ export default function GameScreen() {
         isNewHighScore={isNewHighScore}
         linesCleared={game.linesCleared}
         mode="classic"
-        onRestart={() => game.restart()}
+        onRestart={handleRestart}
         onHome={() => router.replace('/')}
         onShowLeaderboard={() => presentDashboard(LEADERBOARD_IDS.classic)}
+        rivalDefeated={rivalDefeatedRef.current}
+        onSendChallenge={
+          rivalDefeatedRef.current
+            ? () => {
+                sendVengeanceChallenge(
+                  rivalDefeatedRef.current!.playerId,
+                  game.score,
+                  LEADERBOARD_IDS.classic,
+                  'Te he superado en BlockZen!',
+                );
+              }
+            : undefined
+        }
       />
 
       {/* Settings Modal */}
@@ -409,7 +520,7 @@ export default function GameScreen() {
         vibrationEnabled={settings.vibrationEnabled}
         onToggleSound={toggleSound}
         onToggleVibration={toggleVibration}
-        onRestart={() => game.restart()}
+        onRestart={handleRestart}
         onHome={() => router.replace('/')}
         onClose={() => setSettingsVisible(false)}
       />
@@ -545,6 +656,31 @@ const styles = StyleSheet.create({
     textShadowOffset: { width: 0, height: 0 },
     textShadowRadius: 10,
     zIndex: 40,
+  },
+  // ── Vengeance overlay ──
+  vengeanceOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 60,
+  },
+  vengeanceGlow: {
+    position: 'absolute',
+    width: 160,
+    height: 160,
+    borderRadius: 80,
+    backgroundColor: '#FFD700',
+    opacity: 0.1,
+  },
+  vengeanceText: {
+    fontSize: 20,
+    fontWeight: '900',
+    color: '#FFD700',
+    letterSpacing: 1,
+    textShadowColor: 'rgba(255, 215, 0, 0.6)',
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 16,
+    textAlign: 'center',
   },
   // ── Stats ──
   statsBar: {

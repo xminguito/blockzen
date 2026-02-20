@@ -13,7 +13,7 @@
  * - Chain reactions: more particles + larger spread
  */
 
-import React, { useCallback, useEffect, useRef } from 'react';
+import React, { useCallback, useEffect, useImperativeHandle, useRef, forwardRef } from 'react';
 import { StyleSheet } from 'react-native';
 import { Canvas, Circle, Group } from '@shopify/react-native-skia';
 import {
@@ -57,6 +57,10 @@ const FRAME_INTERVAL = 16; // ~60fps
 // PROPS
 // ═══════════════════════════════════════════════════════════════════════════
 
+export interface ParticleCanvasHandle {
+  spawnVengeanceBurst: () => void;
+}
+
 export interface ParticleCanvasProps {
   /** Indices of cells currently being cleared */
   clearingCells: SharedValue<number[]>;
@@ -72,13 +76,14 @@ export interface ParticleCanvasProps {
 // COMPONENT
 // ═══════════════════════════════════════════════════════════════════════════
 
-export function ParticleCanvas({
+export const ParticleCanvas = forwardRef<ParticleCanvasHandle, ParticleCanvasProps>(
+function ParticleCanvasInner({
   clearingCells,
   gridDisplay,
   boardSize,
   cellSize,
   gap,
-}: ParticleCanvasProps) {
+}, ref) {
   const particlesRef = useRef<Particle[]>([]);
   const animFrameRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const prevClearingRef = useRef<number[]>([]);
@@ -227,6 +232,44 @@ export function ParticleCanvas({
     animFrameRef.current = setTimeout(tick, FRAME_INTERVAL);
   }, [tick]);
 
+  /** Vengeance burst — golden particles from board center */
+  const spawnVengeanceBurst = useCallback(() => {
+    const cx = boardSize / 2;
+    const cy = boardSize / 2;
+    const gold: readonly [number, number, number] = [1, 0.84, 0];
+    const count = 40;
+    const burst: Particle[] = [];
+
+    for (let i = 0; i < count; i++) {
+      const angle = (Math.PI * 2 * i) / count + (Math.random() - 0.5) * 0.6;
+      const speed = 4 + Math.random() * 6;
+      const v = 0.85 + Math.random() * 0.3;
+      const color: readonly [number, number, number] = [
+        Math.min(1, gold[0] * v),
+        Math.min(1, gold[1] * v),
+        Math.min(1, gold[2] * v),
+      ];
+      const isBig = Math.random() > 0.5;
+      burst.push({
+        x: cx + (Math.random() - 0.5) * 20,
+        y: cy + (Math.random() - 0.5) * 20,
+        vx: Math.cos(angle) * speed * (isBig ? 0.7 : 1),
+        vy: Math.sin(angle) * speed - 3.0,
+        radius: isBig ? 3.5 + Math.random() * 3.5 : 1.5 + Math.random() * 3,
+        color,
+        life: 0,
+        maxLife: 800 + Math.random() * 300,
+        gravity: GRAVITY + Math.random() * 0.003,
+      });
+    }
+
+    const all = [...particlesRef.current, ...burst];
+    particlesRef.current = all.slice(-MAX_PARTICLES);
+    startAnimation();
+  }, [boardSize, startAnimation]);
+
+  useImperativeHandle(ref, () => ({ spawnVengeanceBurst }), [spawnVengeanceBurst]);
+
   /** Watch clearingCells and spawn particles for new entries */
   useEffect(() => {
     // Poll clearingCells for changes (JS thread bridge)
@@ -276,7 +319,7 @@ export function ParticleCanvas({
       </Group>
     </Canvas>
   );
-}
+});
 
 // ═══════════════════════════════════════════════════════════════════════════
 // PARTICLE DOT — Individual Skia Circle driven by SharedValue

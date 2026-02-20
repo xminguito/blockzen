@@ -81,7 +81,7 @@ import('expo-haptics')
 import { isVibrationEnabled } from './useSettings';
 import { playSound, playSoundWithVolume } from '../core/sounds';
 
-function triggerHaptic(level: HapticLevel): void {
+export function triggerHaptic(level: HapticLevel): void {
   const H = HapticsModule;
   if (!H) return;
   if (!isVibrationEnabled()) return;

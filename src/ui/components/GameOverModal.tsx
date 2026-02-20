@@ -35,6 +35,10 @@ export interface GameOverModalProps {
   onHome: () => void;
   /** Optional: opens Game Center leaderboard (iOS only) */
   onShowLeaderboard?: () => void;
+  /** Friend surpassed this game — enables challenge button */
+  rivalDefeated?: { alias: string; playerId: string } | null;
+  /** Send vengeance challenge to the defeated rival */
+  onSendChallenge?: () => void;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -51,6 +55,8 @@ export function GameOverModal({
   onRestart,
   onHome,
   onShowLeaderboard,
+  rivalDefeated,
+  onSendChallenge,
 }: GameOverModalProps) {
   if (!visible) return null;
 
@@ -97,6 +103,23 @@ export function GameOverModal({
               <Text style={styles.statLabel}>Best</Text>
             </View>
           </View>
+
+          {/* Rival Defeated — Vengeance challenge */}
+          {rivalDefeated != null && onSendChallenge != null && (
+            <View style={styles.vengeanceSection}>
+              <Text style={styles.vengeanceText}>
+                Has superado a {rivalDefeated.alias}!
+              </Text>
+              <Pressable
+                style={[styles.button, styles.vengeanceButton]}
+                onPress={onSendChallenge}
+              >
+                <Text style={styles.vengeanceButtonText}>
+                  Enviar Desafio a {rivalDefeated.alias}
+                </Text>
+              </Pressable>
+            </View>
+          )}
 
           {/* Actions */}
           <View style={styles.actions}>
@@ -254,5 +277,35 @@ const styles = StyleSheet.create({
   },
   secondaryText: {
     color: 'rgba(255, 255, 255, 0.6)',
+  },
+  vengeanceSection: {
+    width: '100%',
+    alignItems: 'center',
+    marginBottom: 20,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    backgroundColor: 'rgba(255, 215, 0, 0.08)',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 215, 0, 0.2)',
+  },
+  vengeanceText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#FFD700',
+    marginBottom: 10,
+    letterSpacing: 0.5,
+  },
+  vengeanceButton: {
+    width: '100%',
+    backgroundColor: 'rgba(255, 215, 0, 0.15)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 215, 0, 0.35)',
+  },
+  vengeanceButtonText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#FFD700',
+    letterSpacing: 0.5,
   },
 });
