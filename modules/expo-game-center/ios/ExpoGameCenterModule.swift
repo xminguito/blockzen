@@ -54,20 +54,58 @@ public class ExpoGameCenterModule: Module {
     true
   }
 
+  // MARK: - Top View Controller
+  //
+  // Walks the presentedViewController chain from the key window's root so
+  // we always land on the topmost visible VC, even if Expo Router or another
+  // RN system has pushed an intermediate presented controller.
+
   private func topViewController() -> UIViewController? {
-    guard let windowScene = UIApplication.shared.connectedScenes
-      .filter({ $0.activationState == .foregroundActive })
-      .compactMap({ $0 as? UIWindowScene })
-      .first,
-      let window = windowScene.windows.first(where: { $0.isKeyWindow }) else {
-      gcLog("topViewController: no key window")
+    guard
+      let windowScene = UIApplication.shared.connectedScenes
+        .filter({ $0.activationState == .foregroundActive })
+        .compactMap({ $0 as? UIWindowScene })
+        .first,
+      let window = windowScene.windows.first(where: { $0.isKeyWindow })
+    else {
+      gcLog("topViewController: no active key window found")
       return nil
     }
     var top = window.rootViewController
     while let presented = top?.presentedViewController {
+      // Skip view controllers that are being dismissed to avoid presenting
+      // on a VC mid-transition (UIKit silently drops present() in that state).
+      if presented.isBeingDismissed { break }
       top = presented
     }
+    gcLog("topViewController: resolved to \(type(of: top!))")
     return top
+  }
+
+  // MARK: - Shared Leaderboard VC Helper
+  //
+  // Opens GKGameCenterViewController scoped to a specific leaderboard with
+  // friends-only ranking. Used as fallback when the deprecated GKScore
+  // challenge compose controller is unavailable (returns nil on iOS 17+).
+
+  private func presentLeaderboardVC(
+    leaderboardId: String,
+    playerScope: GKLeaderboard.PlayerScope,
+    top: UIViewController,
+    promise: Promise
+  ) {
+    let delegate = GameCenterDelegate(promise: promise) { [weak self] in
+      self?.gameCenterDelegateRetainer = nil
+    }
+    gameCenterDelegateRetainer = delegate
+    let vc = GKGameCenterViewController(
+      leaderboardID: leaderboardId,
+      playerScope: playerScope,
+      timeScope: .allTime
+    )
+    vc.gameCenterDelegate = delegate
+    gcLog("presentLeaderboardVC: presenting leaderboard=\(leaderboardId) scope=\(playerScope.rawValue)")
+    top.present(vc, animated: true)
   }
 
   // MARK: - Authentication
@@ -247,84 +285,190 @@ public class ExpoGameCenterModule: Module {
     top.present(vc, animated: true)
   }
 
-  // MARK: - Challenge Composer (open Apple's native friend picker)
+  // MARK: - Challenge Composer
+  //
+  // Modern path (iOS 14+):
+  //   1. GKLeaderboard.loadLeaderboards — validates the leaderboard ID against
+  //      App Store Connect. If the ID is wrong this fails immediately with a
+  //      clear log instead of a silent nil.
+  //   2. leaderboard.loadEntries — retrieves the player's verified server-side
+  //      score (GKLeaderboard.Entry). Using the server score avoids the edge
+  //      case where GKScore rejects a locally-computed value.
+  //   3. GKScore.challengeComposeController — still functional on iOS 14–16.
+  //      If it returns nil (iOS 17+ removes the challenge compose UI from the
+  //      framework), we fall back to GKGameCenterViewController with
+  //      friendsOnly scope so the user can interact with their friends from
+  //      Apple's official leaderboard UI.
 
   private func challengeComposer(score: Int, leaderboardId: String, promise: Promise) {
     gcLog("challengeComposer: score=\(score), leaderboard=\(leaderboardId)")
     guard ensureGameCenterAvailable(promise: promise) else { return }
 
     guard GKLocalPlayer.local.isAuthenticated else {
+      gcLog("challengeComposer: player not authenticated")
       promise.reject(errorCodeUnavailable, "Player is not authenticated with Game Center")
       return
     }
 
     guard let top = topViewController() else {
+      gcLog("challengeComposer: could not resolve top VC")
       promise.reject(errorCodeUnavailable, "Could not find a view controller to present from")
       return
     }
 
-    let scoreObj = GKScore(leaderboardIdentifier: leaderboardId)
-    scoreObj.value = Int64(score)
-    scoreObj.context = 0
+    // Step 1 — Validate leaderboard ID via the modern GKLeaderboard API.
+    GKLeaderboard.loadLeaderboards(IDs: [leaderboardId]) { [weak self] leaderboards, error in
+      guard let self = self else { return }
 
-    guard let vc = scoreObj.challengeComposeController(
-      withPlayers: [],
-      message: nil,
-      completionHandler: { composeVC, _, _ in
+      if let error = error {
+        gcLog("challengeComposer: loadLeaderboards error: \(error.localizedDescription) — falling back to leaderboard UI")
         DispatchQueue.main.async {
-          composeVC.presentingViewController?.dismiss(animated: true) {
-            gcLog("challengeComposer: modal dismissed, returning to game")
-            promise.resolve(nil)
+          self.presentLeaderboardVC(leaderboardId: leaderboardId, playerScope: .friendsOnly, top: top, promise: promise)
+        }
+        return
+      }
+
+      guard let leaderboard = leaderboards?.first else {
+        // Leaderboard ID mismatch with App Store Connect — log clearly.
+        gcLog("challengeComposer: leaderboard '\(leaderboardId)' not found. Verify the ID in App Store Connect > Game Center > Leaderboards — falling back to leaderboard UI")
+        DispatchQueue.main.async {
+          self.presentLeaderboardVC(leaderboardId: leaderboardId, playerScope: .friendsOnly, top: top, promise: promise)
+        }
+        return
+      }
+
+      // Step 2 — Load the player's verified server-side entry.
+      leaderboard.loadEntries(for: .global, timeScope: .allTime, range: NSRange(location: 1, length: 1)) { localEntry, _, _, loadError in
+        if let loadError = loadError {
+          gcLog("challengeComposer: loadEntries error: \(loadError.localizedDescription)")
+        }
+
+        // Prefer the server-verified score; fall back to the passed value.
+        let verifiedScore = localEntry?.score ?? score
+        gcLog("challengeComposer: verifiedScore=\(verifiedScore), localEntry=\(localEntry != nil ? "found (rank \(localEntry!.rank))" : "nil — player may not have a submitted score yet")")
+
+        DispatchQueue.main.async {
+          // Step 3 — Attempt the deprecated-but-functional challenge compose
+          // controller.  GKScore is deprecated in iOS 14 but the runtime still
+          // honours it on iOS 14–16.  On iOS 17+ the framework removed the
+          // challenge sheet; challengeComposeController returns nil, so we
+          // fall through to the GKGameCenterViewController fallback.
+          let scoreObj = GKScore(leaderboardIdentifier: leaderboardId)
+          scoreObj.value = Int64(verifiedScore)
+          scoreObj.context = 0
+
+          if let vc = scoreObj.challengeComposeController(
+            withPlayers: [],
+            message: nil,
+            completionHandler: { composeVC, _, _ in
+              DispatchQueue.main.async {
+                composeVC.presentingViewController?.dismiss(animated: true) {
+                  gcLog("challengeComposer: compose VC dismissed")
+                  promise.resolve(nil)
+                }
+              }
+            }
+          ) {
+            gcLog("challengeComposer: GKScore compose VC obtained — presenting")
+            top.present(vc, animated: true)
+          } else {
+            gcLog("challengeComposer: GKScore.challengeComposeController returned nil (iOS 17+) — presenting leaderboard friends view as fallback")
+            self.presentLeaderboardVC(leaderboardId: leaderboardId, playerScope: .friendsOnly, top: top, promise: promise)
           }
         }
       }
-    ) else {
-      promise.reject(errorCodeUnavailable, "Could not create challenge compose controller")
-      return
     }
-
-    gcLog("challengeComposer: presenting native friend picker")
-    top.present(vc, animated: true)
   }
 
-  // MARK: - Send Vengeance Challenge (GKScore.challengeComposeController)
+  // MARK: - Send Vengeance Challenge
+  //
+  // Same modern flow as challengeComposer: validate ID → load entry → try
+  // GKScore compose with pre-selected friend → fall back to leaderboard UI.
 
-  private func sendVengeanceChallenge(friendId: String, score: Int, leaderboardId: String, message: String?, promise: Promise) {
+  private func sendVengeanceChallenge(
+    friendId: String,
+    score: Int,
+    leaderboardId: String,
+    message: String?,
+    promise: Promise
+  ) {
     gcLog("sendVengeanceChallenge: friendId=\(friendId), score=\(score), leaderboard=\(leaderboardId)")
     guard ensureGameCenterAvailable(promise: promise) else { return }
 
     guard GKLocalPlayer.local.isAuthenticated else {
+      gcLog("sendVengeanceChallenge: player not authenticated")
       promise.reject(errorCodeUnavailable, "Player is not authenticated with Game Center")
       return
     }
 
     guard let top = topViewController() else {
+      gcLog("sendVengeanceChallenge: could not resolve top VC")
       promise.reject(errorCodeUnavailable, "Could not find a view controller to present from")
       return
     }
 
-    let scoreObj = GKScore(leaderboardIdentifier: leaderboardId)
-    scoreObj.value = Int64(score)
-    scoreObj.context = 0
+    // Step 1 — Validate leaderboard ID.
+    GKLeaderboard.loadLeaderboards(IDs: [leaderboardId]) { [weak self] leaderboards, error in
+      guard let self = self else { return }
 
-    let msg = message ?? "¡Bateme! Conseguí \(score) puntos."
-    guard let vc = scoreObj.challengeComposeController(withPlayers: [friendId], message: msg, completionHandler: { composeVC, didIssue, _ in
-      DispatchQueue.main.async {
-        composeVC.presentingViewController?.dismiss(animated: true)
-        if didIssue {
-          gcLog("sendVengeanceChallenge: challenge sent")
-          promise.resolve(nil)
-        } else {
-          gcLog("sendVengeanceChallenge: user cancelled")
-          promise.reject(self.errorCodeUserCancelled, "User cancelled challenge")
+      if let error = error {
+        gcLog("sendVengeanceChallenge: loadLeaderboards error: \(error.localizedDescription) — falling back to leaderboard UI")
+        DispatchQueue.main.async {
+          self.presentLeaderboardVC(leaderboardId: leaderboardId, playerScope: .friendsOnly, top: top, promise: promise)
+        }
+        return
+      }
+
+      guard let leaderboard = leaderboards?.first else {
+        gcLog("sendVengeanceChallenge: leaderboard '\(leaderboardId)' not found — falling back to leaderboard UI")
+        DispatchQueue.main.async {
+          self.presentLeaderboardVC(leaderboardId: leaderboardId, playerScope: .friendsOnly, top: top, promise: promise)
+        }
+        return
+      }
+
+      // Step 2 — Load the player's verified server-side entry.
+      leaderboard.loadEntries(for: .global, timeScope: .allTime, range: NSRange(location: 1, length: 1)) { localEntry, _, _, loadError in
+        if let loadError = loadError {
+          gcLog("sendVengeanceChallenge: loadEntries error: \(loadError.localizedDescription)")
+        }
+
+        let verifiedScore = localEntry?.score ?? score
+        gcLog("sendVengeanceChallenge: verifiedScore=\(verifiedScore)")
+
+        DispatchQueue.main.async {
+          // Step 3 — Attempt challenge compose with the specific friend pre-selected.
+          let scoreObj = GKScore(leaderboardIdentifier: leaderboardId)
+          scoreObj.value = Int64(verifiedScore)
+          scoreObj.context = 0
+
+          let msg = message ?? "¡Bateme! Conseguí \(verifiedScore) puntos."
+
+          if let vc = scoreObj.challengeComposeController(
+            withPlayers: [friendId],
+            message: msg,
+            completionHandler: { composeVC, didIssue, _ in
+              DispatchQueue.main.async {
+                composeVC.presentingViewController?.dismiss(animated: true)
+                if didIssue {
+                  gcLog("sendVengeanceChallenge: challenge sent successfully")
+                  promise.resolve(nil)
+                } else {
+                  gcLog("sendVengeanceChallenge: user cancelled compose sheet")
+                  promise.reject(self.errorCodeUserCancelled, "User cancelled challenge")
+                }
+              }
+            }
+          ) {
+            gcLog("sendVengeanceChallenge: GKScore compose VC obtained — presenting with friend \(friendId) pre-selected")
+            top.present(vc, animated: true)
+          } else {
+            gcLog("sendVengeanceChallenge: GKScore.challengeComposeController returned nil — presenting leaderboard friends view as fallback")
+            self.presentLeaderboardVC(leaderboardId: leaderboardId, playerScope: .friendsOnly, top: top, promise: promise)
+          }
         }
       }
-    }) else {
-      promise.reject(errorCodeUnavailable, "Could not create challenge compose controller")
-      return
     }
-
-    top.present(vc, animated: true)
   }
 }
 
