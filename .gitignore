@@ -16,3 +16,6 @@ node_modules
 .env.test
 .env.production
 .pnpm-store/
+*.ipa
+*.apk
+*.aab
