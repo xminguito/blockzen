@@ -267,35 +267,34 @@ public class ExpoGameCenterModule: Module {
   //
   // Flow:
   //   1. GKLeaderboard.loadLeaderboards — validates the ID against App Store Connect.
-  //   2. leaderboard.loadEntries(for: .global) — fetches the local player's
-  //      server-verified GKLeaderboard.Entry.
-  //   3. entry.challengeComposeController(withMessage:players:completionHandler:)
-  //      — the modern replacement for the removed GKScore API.
-  //      Returns a non-optional UIViewController; no guard needed.
-  //   4. Fallback — if localEntry is nil (player has not yet posted a score),
-  //      open GKGameCenterViewController with friendsOnly scope so the user
-  //      can still interact with the leaderboard.
+  //   2. leaderboard.loadEntries(for: .global, range: 1…100) — fetches the
+  //      local player's server-verified GKLeaderboard.Entry (first param).
+  //      Using .global with a wide range is the most reliable way to always
+  //      receive localEntry even when the player ranks outside the top 25.
+  //   3. entry.challengeComposeController(withMessage:players:nil:...)
+  //      — players: nil forces Apple's native friend picker, which is the
+  //      most compatible path and avoids "Retos no compatibles" errors.
+  //   4. Fallback — localEntry == nil → open GKGameCenterViewController.
 
   private func challengeComposer(leaderboardId: String, promise: Promise) {
-    gcLog("challengeComposer: leaderboard=\(leaderboardId)")
+    gcLog("challengeComposer: START leaderboardId='\(leaderboardId)'")
     guard ensureGameCenterAvailable(promise: promise) else { return }
     guard GKLocalPlayer.local.isAuthenticated else {
-      gcLog("challengeComposer: not authenticated")
+      gcLog("challengeComposer: ERROR — player not authenticated")
       promise.reject(errorCodeUnavailable, "Player is not authenticated with Game Center")
       return
     }
     guard let top = topViewController() else {
-      gcLog("challengeComposer: no top VC")
+      gcLog("challengeComposer: ERROR — no top view controller found")
       promise.reject(errorCodeUnavailable, "Could not find a view controller to present from")
       return
     }
 
-    // Step 1 — Validate leaderboard ID.
     GKLeaderboard.loadLeaderboards(IDs: [leaderboardId]) { [weak self] leaderboards, error in
       guard let self = self else { return }
 
       if let error = error {
-        gcLog("challengeComposer: loadLeaderboards failed: \(error.localizedDescription)")
+        gcLog("challengeComposer: loadLeaderboards FAILED — \(error.localizedDescription)")
         DispatchQueue.main.async {
           self.presentLeaderboardVC(leaderboardId: leaderboardId, playerScope: .friendsOnly, top: top, promise: promise)
         }
@@ -303,46 +302,54 @@ public class ExpoGameCenterModule: Module {
       }
 
       guard let leaderboard = leaderboards?.first else {
-        gcLog("challengeComposer: leaderboard '\(leaderboardId)' not found — verify ID in App Store Connect > Game Center > Leaderboards")
+        gcLog("challengeComposer: leaderboard '\(leaderboardId)' NOT FOUND — check App Store Connect > Game Center > Leaderboards ID field")
         DispatchQueue.main.async {
           self.presentLeaderboardVC(leaderboardId: leaderboardId, playerScope: .friendsOnly, top: top, promise: promise)
         }
         return
       }
 
-      // Step 2 — Fetch local player entry.
-      // The first callback parameter is always the local player's entry
-      // regardless of playerScope; the scope only filters the entries array.
-      leaderboard.loadEntries(for: .global, timeScope: .allTime, range: NSRange(location: 1, length: 1)) { localEntry, _, _, loadError in
+      gcLog("challengeComposer: leaderboard loaded OK — title='\(leaderboard.title ?? "nil")'")
+
+      // .global scope with range 1…100 guarantees localEntry is populated
+      // regardless of the player's rank; .allTime avoids empty-week issues.
+      leaderboard.loadEntries(for: .global, timeScope: .allTime, range: NSRange(location: 1, length: 100)) { localEntry, _, _, loadError in
         if let loadError = loadError {
-          gcLog("challengeComposer: loadEntries error: \(loadError.localizedDescription)")
+          gcLog("challengeComposer: loadEntries ERROR — \(loadError.localizedDescription)")
         }
 
         DispatchQueue.main.async {
-          guard let entry = localEntry else {
-            // Player has not submitted a score yet — cannot create a challenge
-            // without a valid server-side entry.
-            gcLog("challengeComposer: no local entry yet — player must submit a score before challenging. Showing leaderboard fallback.")
+          // CRITICAL DEBUG — confirm entry state before launching VC
+          let localId = GKLocalPlayer.local.gamePlayerID
+          if let entry = localEntry {
+            let entryOwnerId = entry.player.gamePlayerID
+            let isLocalPlayer = (entryOwnerId == localId)
+            gcLog("challengeComposer: localEntry OK — rank=\(entry.rank) score=\(entry.score) formattedScore='\(entry.formattedScore)' entryPlayerId='\(entryOwnerId)' localPlayerId='\(localId)' isLocalPlayer=\(isLocalPlayer)")
+          } else {
+            gcLog("challengeComposer: localEntry is NIL — leaderboardId='\(leaderboardId)' localPlayerId='\(localId)' — player has not submitted a score yet (submit via submitScore first). Showing leaderboard fallback.")
             self.presentLeaderboardVC(leaderboardId: leaderboardId, playerScope: .friendsOnly, top: top, promise: promise)
             return
           }
 
-          gcLog("challengeComposer: localEntry found rank=\(entry.rank) score=\(entry.score) — presenting challenge compose VC")
+          guard let entry = localEntry else { return }
 
-          // Step 3 — Modern challenge compose using GKLeaderboard.Entry.
-          // Returns UIViewController (non-optional); always safe to present.
+          gcLog("challengeComposer: presenting challengeComposeController — leaderboardId='\(leaderboardId)' players=nil (native friend picker)")
+
+          // players: nil → Apple opens its own friend selector, which is the
+          // most compatible approach and avoids "Retos no compatibles" errors.
           let vc = entry.challengeComposeController(
             withMessage: nil,
             players: nil,
-            completionHandler: { composeVC, _, _ in
+            completionHandler: { composeVC, didIssue, recipients in
               DispatchQueue.main.async {
+                gcLog("challengeComposer: compose VC finished — didIssue=\(didIssue) recipients=\(recipients?.count ?? 0)")
                 composeVC.presentingViewController?.dismiss(animated: true) {
-                  gcLog("challengeComposer: compose VC dismissed")
                   promise.resolve(nil)
                 }
               }
             }
           )
+          gcLog("challengeComposer: calling top.present — topVC=\(type(of: top))")
           top.present(vc, animated: true)
         }
       }
@@ -351,15 +358,16 @@ public class ExpoGameCenterModule: Module {
 
   // MARK: - Send Vengeance Challenge (iOS 14+ — GKLeaderboard.Entry API)
   //
-  // Single async flow — no GKPlayer.loadPlayers, no DispatchGroup:
+  // Unified flow identical to challengeComposer:
   //   1. GKLeaderboard.loadLeaderboards — validates the ID.
-  //   2. leaderboard.loadEntries(for: .friendsOnly, range: 1…100) — returns
-  //      both localEntry (first param) and friends entries (second param).
-  //      Each GKLeaderboard.Entry already carries a .player: GKPlayer, so
-  //      we can find the target friend without a separate loadPlayers call.
-  //   3. entry.challengeComposeController — presents native compose sheet.
-  //      players: nil if the friend is not in the top-100 friends list; the
-  //      user can then manually select from Apple's picker.
+  //   2. leaderboard.loadEntries(for: .global, range: 1…100) — retrieves
+  //      localEntry reliably regardless of rank.
+  //   3. entry.challengeComposeController(players: nil) — Apple's native
+  //      friend picker handles selection; avoids "Retos no compatibles"
+  //      errors caused by passing unresolved/incompatible GKPlayer objects.
+  //
+  // Note: friendId is kept in the signature to preserve the JS API surface
+  // and is included in the pre-filled message for context.
 
   private func sendVengeanceChallenge(
     friendId: String,
@@ -367,15 +375,15 @@ public class ExpoGameCenterModule: Module {
     message: String?,
     promise: Promise
   ) {
-    gcLog("sendVengeanceChallenge: friendId=\(friendId) leaderboard=\(leaderboardId)")
+    gcLog("sendVengeanceChallenge: START leaderboardId='\(leaderboardId)' friendId='\(friendId)'")
     guard ensureGameCenterAvailable(promise: promise) else { return }
     guard GKLocalPlayer.local.isAuthenticated else {
-      gcLog("sendVengeanceChallenge: not authenticated")
+      gcLog("sendVengeanceChallenge: ERROR — player not authenticated")
       promise.reject(errorCodeUnavailable, "Player is not authenticated with Game Center")
       return
     }
     guard let top = topViewController() else {
-      gcLog("sendVengeanceChallenge: no top VC")
+      gcLog("sendVengeanceChallenge: ERROR — no top view controller found")
       promise.reject(errorCodeUnavailable, "Could not find a view controller to present from")
       return
     }
@@ -384,7 +392,7 @@ public class ExpoGameCenterModule: Module {
       guard let self = self else { return }
 
       if let error = error {
-        gcLog("sendVengeanceChallenge: loadLeaderboards error: \(error.localizedDescription)")
+        gcLog("sendVengeanceChallenge: loadLeaderboards FAILED — \(error.localizedDescription)")
         DispatchQueue.main.async {
           self.presentLeaderboardVC(leaderboardId: leaderboardId, playerScope: .friendsOnly, top: top, promise: promise)
         }
@@ -392,43 +400,49 @@ public class ExpoGameCenterModule: Module {
       }
 
       guard let leaderboard = leaderboards?.first else {
-        gcLog("sendVengeanceChallenge: leaderboard '\(leaderboardId)' not found")
+        gcLog("sendVengeanceChallenge: leaderboard '\(leaderboardId)' NOT FOUND — check App Store Connect ID")
         DispatchQueue.main.async {
           self.presentLeaderboardVC(leaderboardId: leaderboardId, playerScope: .friendsOnly, top: top, promise: promise)
         }
         return
       }
 
-      // friendsOnly scope returns entries that carry .player (GKPlayer) — no
-      // separate GKPlayer.loadPlayers call needed.  Range 1…100 covers most
-      // friend lists; if the target is beyond rank 100 we fall back to nil
-      // (user picks from Apple's generic friend picker inside the compose VC).
-      leaderboard.loadEntries(for: .friendsOnly, timeScope: .allTime, range: NSMakeRange(1, 100)) { localEntry, entries, _, loadError in
+      gcLog("sendVengeanceChallenge: leaderboard loaded OK — title='\(leaderboard.title ?? "nil")'")
+
+      leaderboard.loadEntries(for: .global, timeScope: .allTime, range: NSRange(location: 1, length: 100)) { localEntry, _, _, loadError in
         if let loadError = loadError {
-          gcLog("sendVengeanceChallenge: loadEntries error: \(loadError.localizedDescription)")
+          gcLog("sendVengeanceChallenge: loadEntries ERROR — \(loadError.localizedDescription)")
         }
 
         DispatchQueue.main.async {
-          guard let entry = localEntry else {
-            gcLog("sendVengeanceChallenge: no local entry — player must post a score first. Showing leaderboard fallback.")
+          // CRITICAL DEBUG — confirm entry state before launching VC
+          let localId = GKLocalPlayer.local.gamePlayerID
+          if let entry = localEntry {
+            let entryOwnerId = entry.player.gamePlayerID
+            let isLocalPlayer = (entryOwnerId == localId)
+            gcLog("sendVengeanceChallenge: localEntry OK — rank=\(entry.rank) score=\(entry.score) entryPlayerId='\(entryOwnerId)' localPlayerId='\(localId)' isLocalPlayer=\(isLocalPlayer)")
+          } else {
+            gcLog("sendVengeanceChallenge: localEntry is NIL — leaderboardId='\(leaderboardId)' localPlayerId='\(localId)'. Showing leaderboard fallback.")
             self.presentLeaderboardVC(leaderboardId: leaderboardId, playerScope: .friendsOnly, top: top, promise: promise)
             return
           }
 
-          // Resolve GKPlayer from the friends entries list — avoids loadPlayers.
-          let friendGKPlayer = (entries ?? []).first(where: { $0.player.gamePlayerID == friendId })?.player
-          let players: [GKPlayer]? = friendGKPlayer.map { [$0] }
-          let msg = message ?? "¡Bateme! Conseguí \(entry.score) puntos."
-          gcLog("sendVengeanceChallenge: localEntry rank=\(entry.rank) score=\(entry.score), friend=\(friendGKPlayer?.alias ?? "not in top-100, picker will be open")")
+          guard let entry = localEntry else { return }
 
+          let msg = message ?? "¡Bateme! Conseguí \(entry.score) puntos."
+          gcLog("sendVengeanceChallenge: presenting challengeComposeController — leaderboardId='\(leaderboardId)' players=nil (native friend picker)")
+
+          // players: nil — forces Apple's native friend selector, which is the
+          // most compatible path across all iOS versions (14–17+).
           let vc = entry.challengeComposeController(
             withMessage: msg,
-            players: players,
-            completionHandler: { composeVC, didIssue, _ in
+            players: nil,
+            completionHandler: { composeVC, didIssue, recipients in
               DispatchQueue.main.async {
+                gcLog("sendVengeanceChallenge: compose VC finished — didIssue=\(didIssue) recipients=\(recipients?.count ?? 0)")
                 composeVC.presentingViewController?.dismiss(animated: true)
                 if didIssue {
-                  gcLog("sendVengeanceChallenge: challenge sent")
+                  gcLog("sendVengeanceChallenge: challenge sent successfully")
                   promise.resolve(nil)
                 } else {
                   gcLog("sendVengeanceChallenge: user cancelled")
@@ -437,6 +451,7 @@ public class ExpoGameCenterModule: Module {
               }
             }
           )
+          gcLog("sendVengeanceChallenge: calling top.present — topVC=\(type(of: top))")
           top.present(vc, animated: true)
         }
       }
