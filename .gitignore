@@ -14,4 +14,4 @@ node_modules
 .env.production.local
 .env.development
 .env.test
-.env.production
+.env.production.pnpm-store/

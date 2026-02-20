@@ -1,0 +1,14 @@
+diff --git a/ios/LocalizationModule.swift b/ios/LocalizationModule.swift
+index ffc4593faa51b518fa9645fcd23fcf13318d74e3..7edcd7327b56859634e94583bf5a5bc786e8061f 100644
+--- a/ios/LocalizationModule.swift
++++ b/ios/LocalizationModule.swift
+@@ -125,8 +125,7 @@ public class LocalizationModule: Module {
+     case .iso8601:
+       return "iso8601"
+     @unknown default:
+-      log.error("Unhandled `Calendar.Identifier` value: \(calendar.identifier), returning `iso8601` as fallback. Add the missing case as soon as possible.")
+-      return "iso8601"
++      return "gregory"
+     }
+   }
+ 
