@@ -309,7 +309,7 @@ public class ExpoGameCenterModule: Module {
         return
       }
 
-      gcLog("challengeComposer: leaderboard loaded OK — title='\(leaderboard.title ?? "nil")'")
+      gcLog("challengeComposer: leaderboard loaded OK — title='\(leaderboard.title ?? "nil")' baseLeaderboardID='\(leaderboard.baseLeaderboardID)'")
 
       // .global scope with range 1…100 guarantees localEntry is populated
       // regardless of the player's rank; .allTime avoids empty-week issues.
@@ -407,7 +407,7 @@ public class ExpoGameCenterModule: Module {
         return
       }
 
-      gcLog("sendVengeanceChallenge: leaderboard loaded OK — title='\(leaderboard.title ?? "nil")'")
+      gcLog("sendVengeanceChallenge: leaderboard loaded OK — title='\(leaderboard.title ?? "nil")' baseLeaderboardID='\(leaderboard.baseLeaderboardID)'")
 
       leaderboard.loadEntries(for: .global, timeScope: .allTime, range: NSRange(location: 1, length: 100)) { localEntry, _, _, loadError in
         if let loadError = loadError {
