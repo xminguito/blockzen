@@ -34,6 +34,8 @@ export interface UseGameCenterReturn {
     leaderboardId: string,
     message?: string
   ) => Promise<void>;
+  /** Open Apple's native friend picker and issue a challenge — no pre-selected friend */
+  issueChallenge: (score: number, leaderboardId: string) => Promise<void>;
   authenticate: () => Promise<boolean>;
   submitScore: (score: number, leaderboardId: string) => void;
   fetchFriendsScores: (leaderboardId: string) => void;
@@ -132,6 +134,19 @@ export function useGameCenter(): UseGameCenterReturn {
     []
   );
 
+  const issueChallenge = useCallback(
+    async (score: number, leaderboardId: string) => {
+      if (Platform.OS !== 'ios') return;
+      if (!ExpoGameCenter.isAvailable?.()) return;
+      try {
+        await ExpoGameCenter.challengeComposer(score, leaderboardId);
+      } catch {
+        // Silent — challenge is a bonus feature; never crash the game over screen
+      }
+    },
+    []
+  );
+
   /** Rival = friend with the smallest score greater than userScore (immediately above) */
   const nextRival = useCallback(
     (userScore: number): FriendScore | null => {
@@ -151,6 +166,7 @@ export function useGameCenter(): UseGameCenterReturn {
     friendsScores,
     nextRival,
     sendVengeanceChallenge,
+    issueChallenge,
     authenticate,
     submitScore,
     fetchFriendsScores,

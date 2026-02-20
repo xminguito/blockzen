@@ -42,6 +42,8 @@ export interface GameOverModalProps {
   rivalDefeated?: { alias: string; playerId: string } | null;
   /** Send vengeance challenge to the defeated rival */
   onSendChallenge?: () => void;
+  /** Open Apple's native friend picker to challenge anyone — shown on new high score */
+  onIssueChallenge?: () => void;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -60,6 +62,7 @@ export function GameOverModal({
   onShowLeaderboard,
   rivalDefeated,
   onSendChallenge,
+  onIssueChallenge,
 }: GameOverModalProps) {
   const { t, i18n } = useTranslation();
 
@@ -94,6 +97,24 @@ export function GameOverModal({
                 {t('game_over.new_high_score')}
               </Text>
             </View>
+          )}
+
+          {/* Challenge Friends — only on new high score, only if Game Center is wired */}
+          {isNewHighScore && onIssueChallenge != null && (
+            <Pressable
+              style={styles.challengeFriendsButton}
+              onPress={onIssueChallenge}
+              accessibilityRole="button"
+              accessibilityLabel={t('game_over.challenge_friends')}
+            >
+              <Text
+                style={styles.challengeFriendsText}
+                numberOfLines={1}
+                adjustsFontSizeToFit
+              >
+                {'⚔️  '}{t('game_over.challenge_friends')}
+              </Text>
+            </Pressable>
           )}
 
           {/* Score */}
@@ -338,6 +359,23 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '700',
     color: '#FFD700',
+    letterSpacing: 0.5,
+  },
+  challengeFriendsButton: {
+    marginTop: 8,
+    marginBottom: 4,
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 215, 0, 0.45)',
+    backgroundColor: 'transparent',
+    alignItems: 'center',
+  },
+  challengeFriendsText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: 'rgba(255, 215, 0, 0.85)',
     letterSpacing: 0.5,
   },
 });

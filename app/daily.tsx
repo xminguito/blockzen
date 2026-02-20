@@ -113,7 +113,12 @@ export default function DailyScreen() {
   const game = useGame('daily');
   const { highScore, isNewHighScore, submitScore } = useHighScore('daily');
   const { settings, toggleSound, toggleVibration } = useSettings();
-  const { submitScore: submitToGameCenter, presentDashboard } = useGameCenter();
+  const {
+    submitScore: submitToGameCenter,
+    presentDashboard,
+    issueChallenge,
+    isAvailable: isGameCenterAvailable,
+  } = useGameCenter();
   const [settingsVisible, setSettingsVisible] = useState(false);
 
   // Handle game over: submit score + record daily result
@@ -312,6 +317,11 @@ export default function DailyScreen() {
         onRestart={() => router.replace('/')}
         onHome={() => router.replace('/')}
         onShowLeaderboard={() => presentDashboard(LEADERBOARD_IDS.daily)}
+        onIssueChallenge={
+          isGameCenterAvailable
+            ? () => issueChallenge(game.score, LEADERBOARD_IDS.daily)
+            : undefined
+        }
       />
 
       {/* Settings Modal */}

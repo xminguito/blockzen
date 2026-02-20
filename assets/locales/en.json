@@ -54,6 +54,7 @@
     "best_label": "Best",
     "vengeance": "You surpassed {{alias}}!",
     "send_challenge": "Challenge {{alias}}",
+    "challenge_friends": "Challenge Friends",
     "play_again": "Play Again",
     "view_board": "View Board",
     "leaderboard": "View Leaderboard",

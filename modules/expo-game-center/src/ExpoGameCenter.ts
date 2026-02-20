@@ -42,6 +42,7 @@ let NativeModule: {
     leaderboardId: string,
     message?: string | null
   ) => Promise<void>;
+  challengeComposer: (score: number, leaderboardId: string) => Promise<void>;
 } | null = null;
 
 function getModule() {
@@ -115,6 +116,20 @@ export async function sendVengeanceChallenge(
   const mod = getModule();
   if (!mod) return;
   return mod.sendVengeanceChallenge(friendId, score, leaderboardId, message ?? undefined);
+}
+
+/**
+ * Open Apple's native challenge compose UI with the friend picker.
+ * No friend is pre-selected — the user picks from within Apple's UI.
+ * Apple handles the push notification to the challenged friends automatically.
+ */
+export async function challengeComposer(
+  score: number,
+  leaderboardId: string
+): Promise<void> {
+  const mod = getModule();
+  if (!mod) return;
+  return mod.challengeComposer(score, leaderboardId);
 }
 
 /**

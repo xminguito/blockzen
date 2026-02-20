@@ -41,6 +41,11 @@ public class ExpoGameCenterModule: Module {
       self.sendVengeanceChallenge(friendId: friendId, score: score, leaderboardId: leaderboardId, message: message, promise: promise)
     }
     .runOnQueue(.main)
+
+    AsyncFunction("challengeComposer") { (score: Int, leaderboardId: String, promise: Promise) in
+      self.challengeComposer(score: score, leaderboardId: leaderboardId, promise: promise)
+    }
+    .runOnQueue(.main)
   }
 
   // MARK: - Availability Check
@@ -239,6 +244,46 @@ public class ExpoGameCenterModule: Module {
     vc.gameCenterDelegate = delegate
 
     gcLog("presentDashboard: presenting leaderboard")
+    top.present(vc, animated: true)
+  }
+
+  // MARK: - Challenge Composer (open Apple's native friend picker)
+
+  private func challengeComposer(score: Int, leaderboardId: String, promise: Promise) {
+    gcLog("challengeComposer: score=\(score), leaderboard=\(leaderboardId)")
+    guard ensureGameCenterAvailable(promise: promise) else { return }
+
+    guard GKLocalPlayer.local.isAuthenticated else {
+      promise.reject(errorCodeUnavailable, "Player is not authenticated with Game Center")
+      return
+    }
+
+    guard let top = topViewController() else {
+      promise.reject(errorCodeUnavailable, "Could not find a view controller to present from")
+      return
+    }
+
+    let scoreObj = GKScore(leaderboardIdentifier: leaderboardId)
+    scoreObj.value = Int64(score)
+    scoreObj.context = 0
+
+    guard let vc = scoreObj.challengeComposeController(
+      withPlayers: [],
+      message: nil,
+      completionHandler: { composeVC, _, _ in
+        DispatchQueue.main.async {
+          composeVC.presentingViewController?.dismiss(animated: true) {
+            gcLog("challengeComposer: modal dismissed, returning to game")
+            promise.resolve(nil)
+          }
+        }
+      }
+    ) else {
+      promise.reject(errorCodeUnavailable, "Could not create challenge compose controller")
+      return
+    }
+
+    gcLog("challengeComposer: presenting native friend picker")
     top.present(vc, animated: true)
   }
 

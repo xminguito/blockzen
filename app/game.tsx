@@ -201,8 +201,10 @@ export default function GameScreen() {
     presentDashboard,
     nextRival,
     sendVengeanceChallenge,
+    issueChallenge,
     fetchFriendsScores,
     isAuthenticated,
+    isAvailable: isGameCenterAvailable,
   } = useGameCenter();
   const [settingsVisible, setSettingsVisible] = useState(false);
 
@@ -519,6 +521,11 @@ export default function GameScreen() {
                   t('game.challenge_message'),
                 );
               }
+            : undefined
+        }
+        onIssueChallenge={
+          isGameCenterAvailable
+            ? () => issueChallenge(game.score, LEADERBOARD_IDS.classic)
             : undefined
         }
       />
