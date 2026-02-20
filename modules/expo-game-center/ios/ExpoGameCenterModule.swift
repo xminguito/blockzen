@@ -351,9 +351,15 @@ public class ExpoGameCenterModule: Module {
 
   // MARK: - Send Vengeance Challenge (iOS 14+ — GKLeaderboard.Entry API)
   //
-  // Same flow as challengeComposer plus loading the GKPlayer object for the
-  // target friend.  Both async fetches (entry + player) run concurrently via
-  // DispatchGroup so total latency equals max(loadEntries, loadPlayers).
+  // Single async flow — no GKPlayer.loadPlayers, no DispatchGroup:
+  //   1. GKLeaderboard.loadLeaderboards — validates the ID.
+  //   2. leaderboard.loadEntries(for: .friendsOnly, range: 1…100) — returns
+  //      both localEntry (first param) and friends entries (second param).
+  //      Each GKLeaderboard.Entry already carries a .player: GKPlayer, so
+  //      we can find the target friend without a separate loadPlayers call.
+  //   3. entry.challengeComposeController — presents native compose sheet.
+  //      players: nil if the friend is not in the top-100 friends list; the
+  //      user can then manually select from Apple's picker.
 
   private func sendVengeanceChallenge(
     friendId: String,
@@ -374,75 +380,66 @@ public class ExpoGameCenterModule: Module {
       return
     }
 
-    let group = DispatchGroup()
-    var localPlayerEntry: GKLeaderboard.Entry?
-    var friendPlayer: GKPlayer?
+    GKLeaderboard.loadLeaderboards(IDs: [leaderboardId]) { [weak self] leaderboards, error in
+      guard let self = self else { return }
 
-    // Fetch 1 — local player's leaderboard entry.
-    group.enter()
-    GKLeaderboard.loadLeaderboards(IDs: [leaderboardId]) { leaderboards, error in
       if let error = error {
         gcLog("sendVengeanceChallenge: loadLeaderboards error: \(error.localizedDescription)")
-        group.leave()
+        DispatchQueue.main.async {
+          self.presentLeaderboardVC(leaderboardId: leaderboardId, playerScope: .friendsOnly, top: top, promise: promise)
+        }
         return
       }
+
       guard let leaderboard = leaderboards?.first else {
         gcLog("sendVengeanceChallenge: leaderboard '\(leaderboardId)' not found")
-        group.leave()
+        DispatchQueue.main.async {
+          self.presentLeaderboardVC(leaderboardId: leaderboardId, playerScope: .friendsOnly, top: top, promise: promise)
+        }
         return
       }
-      leaderboard.loadEntries(for: .global, timeScope: .allTime, range: NSRange(location: 1, length: 1)) { entry, _, _, loadError in
+
+      // friendsOnly scope returns entries that carry .player (GKPlayer) — no
+      // separate GKPlayer.loadPlayers call needed.  Range 1…100 covers most
+      // friend lists; if the target is beyond rank 100 we fall back to nil
+      // (user picks from Apple's generic friend picker inside the compose VC).
+      leaderboard.loadEntries(for: .friendsOnly, timeScope: .allTime, range: NSMakeRange(1, 100)) { localEntry, entries, _, loadError in
         if let loadError = loadError {
           gcLog("sendVengeanceChallenge: loadEntries error: \(loadError.localizedDescription)")
         }
-        localPlayerEntry = entry
-        gcLog("sendVengeanceChallenge: localEntry=\(entry != nil ? "rank \(entry!.rank) score \(entry!.score)" : "nil")")
-        group.leave()
-      }
-    }
 
-    // Fetch 2 — GKPlayer object for the target friend.
-    group.enter()
-    GKPlayer.loadPlayers(forIdentifiers: [friendId]) { players, error in
-      if let error = error {
-        gcLog("sendVengeanceChallenge: loadPlayers error: \(error.localizedDescription)")
-      }
-      friendPlayer = players?.first
-      gcLog("sendVengeanceChallenge: friendPlayer=\(friendPlayer?.alias ?? "nil")")
-      group.leave()
-    }
-
-    // Both fetches complete — present on main queue.
-    group.notify(queue: .main) { [weak self] in
-      guard let self = self else { return }
-
-      guard let entry = localPlayerEntry else {
-        gcLog("sendVengeanceChallenge: no local entry — player must post a score first. Showing leaderboard fallback.")
-        self.presentLeaderboardVC(leaderboardId: leaderboardId, playerScope: .friendsOnly, top: top, promise: promise)
-        return
-      }
-
-      let players: [GKPlayer]? = friendPlayer.map { [$0] }
-      let msg = message ?? "¡Bateme! Conseguí \(entry.score) puntos."
-      gcLog("sendVengeanceChallenge: presenting challenge compose VC — friend pre-selected: \(friendPlayer?.alias ?? "none")")
-
-      let vc = entry.challengeComposeController(
-        withMessage: msg,
-        players: players,
-        completionHandler: { composeVC, didIssue, _ in
-          DispatchQueue.main.async {
-            composeVC.presentingViewController?.dismiss(animated: true)
-            if didIssue {
-              gcLog("sendVengeanceChallenge: challenge sent")
-              promise.resolve(nil)
-            } else {
-              gcLog("sendVengeanceChallenge: user cancelled")
-              promise.reject(self.errorCodeUserCancelled, "User cancelled challenge")
-            }
+        DispatchQueue.main.async {
+          guard let entry = localEntry else {
+            gcLog("sendVengeanceChallenge: no local entry — player must post a score first. Showing leaderboard fallback.")
+            self.presentLeaderboardVC(leaderboardId: leaderboardId, playerScope: .friendsOnly, top: top, promise: promise)
+            return
           }
+
+          // Resolve GKPlayer from the friends entries list — avoids loadPlayers.
+          let friendGKPlayer = (entries ?? []).first(where: { $0.player.gamePlayerID == friendId })?.player
+          let players: [GKPlayer]? = friendGKPlayer.map { [$0] }
+          let msg = message ?? "¡Bateme! Conseguí \(entry.score) puntos."
+          gcLog("sendVengeanceChallenge: localEntry rank=\(entry.rank) score=\(entry.score), friend=\(friendGKPlayer?.alias ?? "not in top-100, picker will be open")")
+
+          let vc = entry.challengeComposeController(
+            withMessage: msg,
+            players: players,
+            completionHandler: { composeVC, didIssue, _ in
+              DispatchQueue.main.async {
+                composeVC.presentingViewController?.dismiss(animated: true)
+                if didIssue {
+                  gcLog("sendVengeanceChallenge: challenge sent")
+                  promise.resolve(nil)
+                } else {
+                  gcLog("sendVengeanceChallenge: user cancelled")
+                  promise.reject(self.errorCodeUserCancelled, "User cancelled challenge")
+                }
+              }
+            }
+          )
+          top.present(vc, animated: true)
         }
-      )
-      top.present(vc, animated: true)
+      }
     }
   }
 }
