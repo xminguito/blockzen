@@ -7,6 +7,20 @@
  * - presentDashboard: opens native GKGameCenterViewController
  * - nextRival: friend with score immediately above user (for "ofensa competitiva")
  * - sendVengeanceChallenge: sends score challenge to a friend
+ *
+ * PRESENTATION TIMING
+ * ─────────────────────────────────────────────────────────────────────────
+ * UIKit silently drops present() calls if the presenting ViewController is
+ * already in a transition (animations, touch handling, etc.).  React Native
+ * Reanimated loops (shimmer) and the spring entrance of the vengeance button
+ * keep the UI "busy" in the frame the user taps.
+ *
+ * The solution: every call that triggers a native UIViewController
+ * presentation goes through `withNativeDelay`, which:
+ *   1. InteractionManager.runAfterInteractions — waits for all pending RN
+ *      gesture/touch interactions to settle.
+ *   2. setTimeout(100ms) — gives UIKit a clean run-loop turn before calling
+ *      present(), eliminating the "already presenting" silent failure.
  */
 
 import { useCallback, useEffect, useState } from 'react';
@@ -43,6 +57,29 @@ export interface UseGameCenterReturn {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
+// HELPERS
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * Delay a native UIViewController presentation until:
+ *   - All pending RN interactions (touches, animations) have settled, AND
+ *   - A 100ms buffer has elapsed so UIKit is in a clean state.
+ *
+ * This prevents UIKit's silent "already presenting" failure that occurs when
+ * present() is called while a Reanimated loop or spring animation is still
+ * running on the same frame as the tap.
+ */
+function withNativeDelay<T>(fn: () => Promise<T>): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    InteractionManager.runAfterInteractions(() => {
+      setTimeout(() => {
+        fn().then(resolve).catch(reject);
+      }, 100);
+    });
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
 // HOOK
 // ═══════════════════════════════════════════════════════════════════════════
 
@@ -65,8 +102,8 @@ export function useGameCenter(): UseGameCenterReturn {
           setAlias(player.alias);
         }
       })
-      .catch(() => {
-        // Silent — user may have cancelled or GC unavailable
+      .catch((err) => {
+        if (__DEV__) console.error('[GameCenter] authenticate error:', err);
       })
       .finally(() => {
         setIsLoading(false);
@@ -83,15 +120,18 @@ export function useGameCenter(): UseGameCenterReturn {
         return true;
       }
       return false;
-    } catch {
+    } catch (err) {
+      if (__DEV__) console.error('[GameCenter] authenticate (manual) error:', err);
       return false;
     }
   }, []);
 
   const submitScore = useCallback((score: number, leaderboardId: string) => {
     if (Platform.OS !== 'ios') return;
-    Promise.resolve(ExpoGameCenter.submitScore(score, leaderboardId)).catch(() => {
-      // Silent — Game Center may be unavailable or user not signed in
+    // submitScore in ExpoGameCenter.ts returns void (fire-and-forget internally).
+    // Promise.resolve wraps void safely so .catch() never throws.
+    Promise.resolve(ExpoGameCenter.submitScore(score, leaderboardId)).catch((err) => {
+      if (__DEV__) console.error('[GameCenter] submitScore error:', err);
     });
   }, []);
 
@@ -99,50 +139,75 @@ export function useGameCenter(): UseGameCenterReturn {
     InteractionManager.runAfterInteractions(() => {
       Promise.resolve(ExpoGameCenter.fetchFriendsScores(leaderboardId))
         .then(setFriendsScores)
-        .catch(() => setFriendsScores([]));
+        .catch((err) => {
+          if (__DEV__) console.error('[GameCenter] fetchFriendsScores error:', err);
+          setFriendsScores([]);
+        });
     });
   }, []);
 
-  const presentDashboard = useCallback(async (leaderboardId?: string) => {
+  /**
+   * Present the native Game Center leaderboard dashboard.
+   * Uses withNativeDelay so UIKit is idle before present() is called.
+   */
+  const presentDashboard = useCallback(async (leaderboardId?: string): Promise<void> => {
     if (Platform.OS !== 'ios') return;
-    try {
-      await ExpoGameCenter.presentDashboard(leaderboardId);
-    } catch {
-      // Silent — best-effort; do not disrupt the game with a system alert
-    }
+    return withNativeDelay(async () => {
+      try {
+        await ExpoGameCenter.presentDashboard(leaderboardId);
+      } catch (err) {
+        if (__DEV__) console.error('[GameCenter] presentDashboard error:', err);
+      }
+    });
   }, []);
 
+  /**
+   * Send a vengeance challenge to a specific friend.
+   * Uses withNativeDelay: UIKit drops present() if RN animations are in flight.
+   */
   const sendVengeanceChallenge = useCallback(
     async (
       friendId: string,
       score: number,
       leaderboardId: string,
       message?: string
-    ) => {
+    ): Promise<void> => {
       if (Platform.OS !== 'ios') return;
-      try {
-        await ExpoGameCenter.sendVengeanceChallenge(
-          friendId,
-          score,
-          leaderboardId,
-          message
-        );
-      } catch {
-        // Silent — challenge is a bonus feature; never crash the game over screen
-      }
+      return withNativeDelay(async () => {
+        try {
+          await ExpoGameCenter.sendVengeanceChallenge(
+            friendId,
+            score,
+            leaderboardId,
+            message
+          );
+        } catch (err) {
+          // Reject for user-cancelled is expected — only log unexpected errors.
+          if (__DEV__) console.error('[GameCenter] sendVengeanceChallenge error:', err);
+        }
+      });
     },
     []
   );
 
+  /**
+   * Open Apple's native friend picker (GKScore.challengeComposeController).
+   * Uses withNativeDelay: same timing requirement as sendVengeanceChallenge.
+   *
+   * NOTE: isAvailable is checked at the call-site in game.tsx.
+   * The redundant guard here is removed to avoid masking rejections from the
+   * native layer that we want to log for debugging.
+   */
   const issueChallenge = useCallback(
-    async (score: number, leaderboardId: string) => {
+    async (score: number, leaderboardId: string): Promise<void> => {
       if (Platform.OS !== 'ios') return;
-      if (!ExpoGameCenter.isAvailable?.()) return;
-      try {
-        await ExpoGameCenter.challengeComposer(score, leaderboardId);
-      } catch {
-        // Silent — challenge is a bonus feature; never crash the game over screen
-      }
+      return withNativeDelay(async () => {
+        try {
+          await ExpoGameCenter.challengeComposer(score, leaderboardId);
+        } catch (err) {
+          if (__DEV__) console.error('[GameCenter] challengeComposer error:', err);
+        }
+      });
     },
     []
   );
