@@ -174,7 +174,7 @@ export function GameOverModal({
                   colors={GOLD_GRADIENT}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 0, y: 1 }}
-                  style={StyleSheet.absoluteFill}
+                  style={[StyleSheet.absoluteFill, styles.gradientFill]}
                 />
                 <Animated.View
                   style={[styles.shimmerRay, shimmerStyle]}
@@ -245,7 +245,7 @@ export function GameOverModal({
                     colors={GOLD_GRADIENT}
                     start={{ x: 0, y: 0 }}
                     end={{ x: 0, y: 1 }}
-                    style={StyleSheet.absoluteFill}
+                    style={[StyleSheet.absoluteFill, styles.gradientFill]}
                   />
                   {/* Diagonal shimmer ray */}
                   <Animated.View
@@ -496,8 +496,13 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     alignItems: 'center',
     overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: '#FFD700',
+    // Explicit transparent prevents Android Pressable system background from
+    // rendering on top of the LinearGradient fill.
+    backgroundColor: 'transparent',
+    // Two-tone border: gold base + white material rim overlay (applied via borderColor).
+    // The white at 0.5 opacity over the gold gives the appearance of a lit metal edge.
+    borderWidth: 1.5,
+    borderColor: 'rgba(255, 255, 255, 0.5)',
   },
 
   // ── Challenge Friends button (same metallic treatment, compact) ──
@@ -508,8 +513,9 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     paddingHorizontal: 20,
     borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#FFD700',
+    backgroundColor: 'transparent',
+    borderWidth: 1.5,
+    borderColor: 'rgba(255, 255, 255, 0.5)',
     alignItems: 'center',
     overflow: 'hidden',
   },
@@ -530,6 +536,13 @@ const styles = StyleSheet.create({
   /** Icon rendered ~20% brighter than surrounding text via near-white gold tint */
   buttonIcon: {
     color: '#FFFDE0',
+  },
+
+  // ── Gradient fill: explicit borderRadius + transparent base so Android never
+  //    renders a system opaque background underneath the gradient layer ──
+  gradientFill: {
+    borderRadius: 14,
+    backgroundColor: 'transparent',
   },
 
   // ── Diagonal shimmer ray (skewed strip traversing button left→right) ──

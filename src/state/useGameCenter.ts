@@ -58,7 +58,7 @@ export function useGameCenter(): UseGameCenterReturn {
       return;
     }
 
-    ExpoGameCenter.authenticate()
+    Promise.resolve(ExpoGameCenter.authenticate())
       .then((player) => {
         if (player) {
           setPlayerId(player.playerId);
@@ -90,14 +90,14 @@ export function useGameCenter(): UseGameCenterReturn {
 
   const submitScore = useCallback((score: number, leaderboardId: string) => {
     if (Platform.OS !== 'ios') return;
-    ExpoGameCenter.submitScore(score, leaderboardId).catch(() => {
+    Promise.resolve(ExpoGameCenter.submitScore(score, leaderboardId)).catch(() => {
       // Silent — Game Center may be unavailable or user not signed in
     });
   }, []);
 
   const fetchFriendsScores = useCallback((leaderboardId: string) => {
     InteractionManager.runAfterInteractions(() => {
-      ExpoGameCenter.fetchFriendsScores(leaderboardId)
+      Promise.resolve(ExpoGameCenter.fetchFriendsScores(leaderboardId))
         .then(setFriendsScores)
         .catch(() => setFriendsScores([]));
     });
