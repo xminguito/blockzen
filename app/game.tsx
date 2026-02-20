@@ -554,7 +554,7 @@ export default function GameScreen() {
 const styles = StyleSheet.create({
   safe: {
     flex: 1,
-    backgroundColor: '#0f2725f5',
+    backgroundColor: '#0f2725',
   },
   container: {
     flex: 1,

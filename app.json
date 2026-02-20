@@ -11,7 +11,7 @@
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#0f2725f5"
+      "backgroundColor": "#0f2725"
     },
     "ios": {
       "supportsTablet": false,
@@ -27,7 +27,7 @@
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#0f2725f5"
+        "backgroundColor": "#0f2725"
       },
       "package": "com.blockzen.app"
     },
@@ -35,7 +35,8 @@
       "expo-router",
       "expo-asset",
       "expo-font",
-      "./plugins/withGameCenter"
+      "./plugins/withGameCenter",
+      "expo-localization"
     ],
     "experiments": {
       "typedRoutes": true

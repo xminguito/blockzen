@@ -38,9 +38,9 @@ export default function RootLayout() {
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: '#0f2725f5',
+    backgroundColor: '#0f2725',
   },
   content: {
-    backgroundColor: '#0f2725f5',
+    backgroundColor: '#0f2725',
   },
 });
