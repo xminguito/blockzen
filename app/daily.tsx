@@ -12,10 +12,11 @@ import {
   View,
   Text,
   StyleSheet,
-  SafeAreaView,
   useWindowDimensions,
   Pressable,
+  Platform,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import Animated, {
   FadeIn,
@@ -91,6 +92,7 @@ function AnimatedDailyScore({ score }: { score: number }) {
 
 export default function DailyScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { width: screenWidth } = useWindowDimensions();
   const { boardSize, cellSize, gap } = computeBoardGeometry(screenWidth);
   const boardRef = useRef<View>(null);
@@ -145,11 +147,18 @@ export default function DailyScreen() {
     [stride],
   );
 
+  const safePadding = {
+    paddingTop: Math.max(insets.top, Platform.OS === 'ios' ? 54 : 28),
+    paddingBottom: Math.max(insets.bottom, 12),
+    paddingLeft: Math.max(insets.left, 0),
+    paddingRight: Math.max(insets.right, 0),
+  };
+
   // Gate: if already played today, show results instead
   if (!isLoading && hasPlayedToday && !game.isGameOver) {
     return (
-      <SafeAreaView style={styles.safe}>
-        <View style={styles.playedContainer}>
+      <View style={styles.safe}>
+        <View style={[styles.playedContainer, safePadding]}>
           <Text style={styles.playedTitle}>Daily Complete</Text>
           <Text style={styles.playedSeed}>{dailySeedLabel}</Text>
           <Text style={styles.playedLabel}>Your Score</Text>
@@ -168,39 +177,31 @@ export default function DailyScreen() {
             <Text style={styles.homeButtonText}>Home</Text>
           </Pressable>
         </View>
-      </SafeAreaView>
+      </View>
     );
   }
 
   if (isLoading) {
     return (
-      <SafeAreaView style={styles.safe}>
-        <View style={styles.playedContainer}>
+      <View style={styles.safe}>
+        <View style={[styles.playedContainer, safePadding]}>
           <Text style={styles.playedHint}>Loading...</Text>
         </View>
-      </SafeAreaView>
+      </View>
     );
   }
 
   return (
-    <SafeAreaView style={styles.safe}>
-      <Animated.View style={styles.container} entering={FadeIn.duration(400)}>
-        {/* HUD */}
-        <View style={styles.hud}>
+    <View style={styles.safe}>
+      <Animated.View
+        style={[styles.container, safePadding]}
+        entering={FadeIn.duration(400)}
+      >
+        {/* Top bar: Home + Gear (posición original) */}
+        <View style={styles.topBar}>
           <Pressable onPress={() => router.back()} style={styles.backButton}>
             <Text style={styles.backText}>{'<'} Home</Text>
           </Pressable>
-
-          <View style={styles.centerHud}>
-            <Text style={styles.dailyBadge}>DAILY</Text>
-            <Text style={styles.dailySeed}>{dailySeedLabel}</Text>
-          </View>
-
-          <View style={styles.scoreSection}>
-            <Text style={styles.scoreLabel}>SCORE</Text>
-            <AnimatedDailyScore score={game.score} />
-          </View>
-
           <Pressable
             onPress={() => setSettingsVisible(true)}
             style={styles.gearButton}
@@ -209,6 +210,19 @@ export default function DailyScreen() {
             <Text style={styles.gearIcon}>⚙️</Text>
           </Pressable>
         </View>
+
+        {/* Score + Board (bajados) */}
+        <View style={styles.gameArea}>
+          <View style={styles.hud}>
+            <View style={styles.centerHud}>
+              <Text style={styles.dailyBadge}>DAILY</Text>
+              <Text style={styles.dailySeed}>{dailySeedLabel}</Text>
+            </View>
+            <View style={styles.scoreSection}>
+              <Text style={styles.scoreLabel}>SCORE</Text>
+              <AnimatedDailyScore score={game.score} />
+            </View>
+          </View>
 
         {/* Combo */}
         {game.comboLabel && (
@@ -242,6 +256,7 @@ export default function DailyScreen() {
             cellSize={cellSize}
             gap={gap}
           />
+        </View>
         </View>
 
         {/* Block Tray */}
@@ -280,7 +295,7 @@ export default function DailyScreen() {
         onHome={() => router.replace('/')}
         onClose={() => setSettingsVisible(false)}
       />
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -296,12 +311,23 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  hud: {
+  topBar: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
+    paddingVertical: 8,
+  },
+  gameArea: {
+    marginTop: 16,
+  },
+  hud: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 16,
     height: 72,
+    gap: 24,
   },
   backButton: {
     paddingVertical: 8,
@@ -341,9 +367,6 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
   },
   gearButton: {
-    position: 'absolute',
-    right: 16,
-    top: 8,
     width: 36,
     height: 36,
     borderRadius: 18,

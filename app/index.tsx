@@ -11,11 +11,12 @@ import {
   Text,
   StyleSheet,
   Pressable,
-  SafeAreaView,
   Platform,
   Alert,
   ActivityIndicator,
+  ScrollView,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import Animated, {
   FadeInDown,
@@ -177,8 +178,13 @@ export default function HomeScreen() {
   }, [isAuthenticated, fetchFriendsScores]);
 
   return (
-    <SafeAreaView style={styles.safe}>
-      <View style={styles.container}>
+    <SafeAreaView style={styles.safe} edges={['top', 'bottom', 'left', 'right']}>
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={styles.container}
+        showsVerticalScrollIndicator={false}
+        bounces={false}
+      >
         {/* Title */}
         <Animated.View
           style={styles.header}
@@ -314,7 +320,7 @@ export default function HomeScreen() {
           </Text>
           <Text style={styles.versionText}>v1.0</Text>
         </Animated.View>
-      </View>
+      </ScrollView>
     </SafeAreaView>
   );
 }
@@ -328,10 +334,14 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#0f2725f5',
   },
-  container: {
+  scroll: {
     flex: 1,
+  },
+  container: {
+    flexGrow: 1,
     paddingHorizontal: 24,
-    justifyContent: 'center',
+    paddingTop: 16,
+    paddingBottom: 24,
   },
   header: {
     alignItems: 'center',

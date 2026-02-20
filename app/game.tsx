@@ -15,10 +15,11 @@ import {
   View,
   Text,
   StyleSheet,
-  SafeAreaView,
   useWindowDimensions,
   Pressable,
+  Platform,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import Animated, {
   FadeIn,
@@ -180,6 +181,7 @@ function BoardComboOverlay({
 
 export default function GameScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { width: screenWidth } = useWindowDimensions();
   const { boardSize, cellSize, gap } = computeBoardGeometry(screenWidth);
   const boardRef = useRef<View>(null);
@@ -281,26 +283,24 @@ export default function GameScreen() {
   );
 
   return (
-    <SafeAreaView style={styles.safe}>
-      <Animated.View style={styles.container} entering={FadeIn.duration(400)}>
-        {/* HUD */}
-        <View style={styles.hud}>
+    <View style={styles.safe}>
+      <Animated.View
+        style={[
+          styles.container,
+          {
+            paddingTop: Math.max(insets.top, Platform.OS === 'ios' ? 54 : 28),
+            paddingBottom: Math.max(insets.bottom, 12),
+            paddingLeft: Math.max(insets.left, 0),
+            paddingRight: Math.max(insets.right, 0),
+          },
+        ]}
+        entering={FadeIn.duration(400)}
+      >
+        {/* Top bar: Home + Gear (posición original) */}
+        <View style={styles.topBar}>
           <Pressable onPress={() => router.back()} style={styles.backButton}>
             <Text style={styles.backText}>{'<'} Home</Text>
           </Pressable>
-
-          <View style={styles.scoreSection}>
-            <Text style={styles.scoreLabel}>S C O R E</Text>
-            <AnimatedScore score={game.score} />
-          </View>
-
-          <View style={styles.hudRight}>
-            <Text style={styles.bestLabel}>BEST</Text>
-            <Text style={styles.bestValue}>
-              {Math.max(highScore, game.score).toLocaleString()}
-            </Text>
-          </View>
-
           <Pressable
             onPress={() => setSettingsVisible(true)}
             style={styles.gearButton}
@@ -309,6 +309,21 @@ export default function GameScreen() {
             <Text style={styles.gearIcon}>⚙️</Text>
           </Pressable>
         </View>
+
+        {/* Score + Board (bajados) */}
+        <View style={styles.gameArea}>
+          <View style={styles.hud}>
+            <View style={styles.scoreSection}>
+              <Text style={styles.scoreLabel}>S C O R E</Text>
+              <AnimatedScore score={game.score} />
+            </View>
+            <View style={styles.hudRight}>
+              <Text style={styles.bestLabel}>BEST</Text>
+              <Text style={styles.bestValue}>
+                {Math.max(highScore, game.score).toLocaleString()}
+              </Text>
+            </View>
+          </View>
 
         {/* Board + Particles + Combo Overlay */}
         <View
@@ -352,6 +367,7 @@ export default function GameScreen() {
               +{floatingPoints.points.toLocaleString()}
             </Animated.Text>
           )}
+        </View>
         </View>
 
         {/* Block Tray */}
@@ -397,7 +413,7 @@ export default function GameScreen() {
         onHome={() => router.replace('/')}
         onClose={() => setSettingsVisible(false)}
       />
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -413,13 +429,24 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  // ── HUD ──
-  hud: {
+  topBar: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
+    paddingVertical: 8,
+  },
+  gameArea: {
+    marginTop: 16,
+  },
+  // ── HUD ──
+  hud: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 16,
     height: HUD_HEIGHT,
+    gap: 24,
   },
   backButton: {
     paddingVertical: 8,
@@ -462,9 +489,6 @@ const styles = StyleSheet.create({
     color: 'rgba(255, 255, 255, 0.5)',
   },
   gearButton: {
-    position: 'absolute',
-    right: 16,
-    top: 8,
     width: 36,
     height: 36,
     borderRadius: 18,
@@ -478,7 +502,7 @@ const styles = StyleSheet.create({
   // ── Board ──
   boardContainer: {
     alignSelf: 'center',
-    marginTop: 4,
+    marginTop: 8,
   },
   // ── Combo overlay (centered on board) ──
   comboOverlay: {
