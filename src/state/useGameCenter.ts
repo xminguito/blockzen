@@ -87,7 +87,10 @@ export function useGameCenter(): UseGameCenterReturn {
   }, []);
 
   const submitScore = useCallback((score: number, leaderboardId: string) => {
-    ExpoGameCenter.submitScore(score, leaderboardId);
+    if (Platform.OS !== 'ios') return;
+    ExpoGameCenter.submitScore(score, leaderboardId).catch(() => {
+      // Silent — Game Center may be unavailable or user not signed in
+    });
   }, []);
 
   const fetchFriendsScores = useCallback((leaderboardId: string) => {
@@ -99,7 +102,12 @@ export function useGameCenter(): UseGameCenterReturn {
   }, []);
 
   const presentDashboard = useCallback(async (leaderboardId?: string) => {
-    return ExpoGameCenter.presentDashboard(leaderboardId);
+    if (Platform.OS !== 'ios') return;
+    try {
+      await ExpoGameCenter.presentDashboard(leaderboardId);
+    } catch {
+      // Silent — best-effort; do not disrupt the game with a system alert
+    }
   }, []);
 
   const sendVengeanceChallenge = useCallback(
@@ -109,12 +117,17 @@ export function useGameCenter(): UseGameCenterReturn {
       leaderboardId: string,
       message?: string
     ) => {
-      return ExpoGameCenter.sendVengeanceChallenge(
-        friendId,
-        score,
-        leaderboardId,
-        message
-      );
+      if (Platform.OS !== 'ios') return;
+      try {
+        await ExpoGameCenter.sendVengeanceChallenge(
+          friendId,
+          score,
+          leaderboardId,
+          message
+        );
+      } catch {
+        // Silent — challenge is a bonus feature; never crash the game over screen
+      }
     },
     []
   );

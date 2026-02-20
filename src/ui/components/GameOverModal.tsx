@@ -86,7 +86,13 @@ export function GameOverModal({
           {/* New High Score Badge */}
           {isNewHighScore && (
             <View style={styles.badge}>
-              <Text style={styles.badgeText}>{t('game_over.new_high_score')}</Text>
+              <Text
+                style={styles.badgeText}
+                numberOfLines={1}
+                adjustsFontSizeToFit
+              >
+                {t('game_over.new_high_score')}
+              </Text>
             </View>
           )}
 
@@ -118,8 +124,14 @@ export function GameOverModal({
               <Pressable
                 style={[styles.button, styles.vengeanceButton]}
                 onPress={onSendChallenge}
+                accessibilityRole="button"
+                accessibilityLabel={t('a11y.send_challenge_to', { alias: rivalDefeated.alias })}
               >
-                <Text style={styles.vengeanceButtonText}>
+                <Text
+                  style={styles.vengeanceButtonText}
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                >
                   {t('game_over.send_challenge', { alias: rivalDefeated.alias })}
                 </Text>
               </Pressable>
@@ -131,8 +143,12 @@ export function GameOverModal({
             <Pressable
               style={[styles.button, styles.primaryButton]}
               onPress={onRestart}
+              accessibilityRole="button"
+              accessibilityLabel={
+                mode === 'daily' ? t('a11y.view_board') : t('a11y.play_again')
+              }
             >
-              <Text style={styles.buttonText}>
+              <Text style={styles.buttonText} numberOfLines={1} adjustsFontSizeToFit>
                 {mode === 'daily' ? t('game_over.view_board') : t('game_over.play_again')}
               </Text>
             </Pressable>
@@ -141,8 +157,14 @@ export function GameOverModal({
               <Pressable
                 style={[styles.button, styles.leaderboardButton]}
                 onPress={onShowLeaderboard}
+                accessibilityRole="button"
+                accessibilityLabel={t('a11y.open_game_center_leaderboard')}
               >
-                <Text style={[styles.buttonText, styles.leaderboardText]}>
+                <Text
+                  style={[styles.buttonText, styles.leaderboardText]}
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                >
                   {t('game_over.leaderboard')}
                 </Text>
               </Pressable>
@@ -151,8 +173,13 @@ export function GameOverModal({
             <Pressable
               style={[styles.button, styles.secondaryButton]}
               onPress={onHome}
+              accessibilityRole="button"
+              accessibilityLabel={t('a11y.go_home')}
             >
-              <Text style={[styles.buttonText, styles.secondaryText]}>
+              <Text
+                style={[styles.buttonText, styles.secondaryText]}
+                numberOfLines={1}
+              >
                 {t('game_over.home')}
               </Text>
             </Pressable>

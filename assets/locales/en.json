@@ -76,5 +76,19 @@
     "incredible": "Incredible!",
     "unbelievable": "Unbelievable!",
     "godlike": "GODLIKE!"
+  },
+  "a11y": {
+    "play_classic": "Play Classic mode",
+    "play_daily": "Play Daily Challenge",
+    "sign_in_game_center": "Sign in to Game Center",
+    "open_leaderboard": "Open leaderboard",
+    "open_settings": "Open settings",
+    "close_settings": "Close settings",
+    "play_again": "Play again",
+    "view_board": "View the board",
+    "go_home": "Go to home screen",
+    "open_game_center_leaderboard": "Open Game Center leaderboard",
+    "send_challenge_to": "Send challenge to {{alias}}",
+    "back_home": "Back to home"
   }
 }

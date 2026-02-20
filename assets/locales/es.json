@@ -76,5 +76,19 @@
     "incredible": "¡Impresionante!",
     "unbelievable": "¡Alucinante!",
     "godlike": "¡DIVINO!"
+  },
+  "a11y": {
+    "play_classic": "Jugar modo Clásico",
+    "play_daily": "Jugar Desafío Diario",
+    "sign_in_game_center": "Iniciar sesión en Game Center",
+    "open_leaderboard": "Abrir clasificación",
+    "open_settings": "Abrir ajustes",
+    "close_settings": "Cerrar ajustes",
+    "play_again": "Jugar de nuevo",
+    "view_board": "Ver el tablero",
+    "go_home": "Ir a la pantalla de inicio",
+    "open_game_center_leaderboard": "Abrir clasificación de Game Center",
+    "send_challenge_to": "Enviar desafío a {{alias}}",
+    "back_home": "Volver al inicio"
   }
 }

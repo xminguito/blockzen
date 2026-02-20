@@ -84,7 +84,9 @@ function ToggleRow({
     <View style={styles.row}>
       <View style={styles.rowLeft}>
         {icon}
-        <Text style={styles.rowLabel}>{label}</Text>
+        <Text style={styles.rowLabel} numberOfLines={1} adjustsFontSizeToFit>
+          {label}
+        </Text>
       </View>
       <Switch
         value={value}
@@ -92,6 +94,7 @@ function ToggleRow({
         trackColor={{ false: 'rgba(255,255,255,0.15)', true: '#4CD964' }}
         thumbColor={Platform.OS === 'android' ? '#FFFFFF' : undefined}
         ios_backgroundColor="rgba(255,255,255,0.15)"
+        accessibilityLabel={label}
       />
     </View>
   );
@@ -118,7 +121,9 @@ function ActionRow({
     <View style={styles.row}>
       <View style={styles.rowLeft}>
         {icon}
-        <Text style={styles.rowLabel}>{label}</Text>
+        <Text style={styles.rowLabel} numberOfLines={1} adjustsFontSizeToFit>
+          {label}
+        </Text>
       </View>
       <Pressable
         style={({ pressed }) => [
@@ -127,8 +132,12 @@ function ActionRow({
           pressed && { opacity: 0.8, transform: [{ scale: 0.96 }] },
         ]}
         onPress={onPress}
+        accessibilityRole="button"
+        accessibilityLabel={label}
       >
-        <Text style={styles.actionButtonText}>{buttonLabel}</Text>
+        <Text style={styles.actionButtonText} numberOfLines={1}>
+          {buttonLabel}
+        </Text>
       </Pressable>
     </View>
   );
@@ -178,6 +187,8 @@ export function SettingsModal({
                 ]}
                 onPress={onClose}
                 hitSlop={12}
+                accessibilityRole="button"
+                accessibilityLabel={t('a11y.close_settings')}
               >
                 <Text style={styles.closeText}>✕</Text>
               </Pressable>
@@ -317,6 +328,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#FFFFFF',
     letterSpacing: 0.3,
+    flexShrink: 1,
   },
   rowSeparator: {
     height: 1,

@@ -136,11 +136,7 @@ export default function HomeScreen() {
 
   const handleGameCenterPress = async () => {
     if (isAuthenticated) {
-      try {
-        await presentDashboard(LEADERBOARD_IDS.classic);
-      } catch (e) {
-        Alert.alert('Game Center', `Error: ${(e as Error).message}`);
-      }
+      await presentDashboard(LEADERBOARD_IDS.classic);
       return;
     }
     if (!isAvailable) {
@@ -158,8 +154,8 @@ export default function HomeScreen() {
       } else {
         Alert.alert('Game Center', t('home.game_center.error'));
       }
-    } catch (e) {
-      Alert.alert('Game Center', `Error: ${(e as Error).message}`);
+    } catch {
+      // Silent — authenticate() already handles errors internally
     } finally {
       setAuthInProgress(false);
     }
@@ -192,7 +188,13 @@ export default function HomeScreen() {
         >
           <Text style={styles.title}>BLOCK</Text>
           <Text style={styles.titleAccent}>ZEN</Text>
-          <Text style={styles.subtitle}>{t('app.subtitle')}</Text>
+          <Text
+            style={styles.subtitle}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+          >
+            {t('app.subtitle')}
+          </Text>
         </Animated.View>
 
         {/* Mode Buttons */}
@@ -206,14 +208,26 @@ export default function HomeScreen() {
                 pressed && styles.cardPressed,
               ]}
               onPress={() => router.push('/game')}
+              accessibilityRole="button"
+              accessibilityLabel={t('a11y.play_classic')}
             >
               <MiniBoard />
-              <Text style={styles.modeTitle}>{t('home.classic.title')}</Text>
-              <Text style={styles.modeDesc}>
+              <Text
+                style={styles.modeTitle}
+                numberOfLines={1}
+                adjustsFontSizeToFit
+              >
+                {t('home.classic.title')}
+              </Text>
+              <Text style={styles.modeDesc} numberOfLines={3}>
                 {t('home.classic.description')}
               </Text>
               {classicHigh > 0 && (
-                <Text style={styles.modeHighScore}>
+                <Text
+                  style={styles.modeHighScore}
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                >
                   {t('home.classic.best', { score: formatScore(classicHigh, i18n.language) })}
                 </Text>
               )}
@@ -230,21 +244,45 @@ export default function HomeScreen() {
                 hasPlayedToday && styles.cardPlayed,
               ]}
               onPress={() => router.push('/daily')}
+              accessibilityRole="button"
+              accessibilityLabel={t('a11y.play_daily')}
             >
               <DailyIcon day={today} />
-              <Text style={styles.modeTitle}>{t('home.daily.title')}</Text>
-              <Text style={styles.modeDesc}>
+              <Text
+                style={styles.modeTitle}
+                numberOfLines={1}
+                adjustsFontSizeToFit
+              >
+                {t('home.daily.title')}
+              </Text>
+              <Text style={styles.modeDesc} numberOfLines={3}>
                 {t('home.daily.description')}
               </Text>
-              <Text style={styles.modeSeed}>{dailySeedLabel}</Text>
+              <Text
+                style={styles.modeSeed}
+                numberOfLines={1}
+                adjustsFontSizeToFit
+              >
+                {dailySeedLabel}
+              </Text>
               {hasPlayedToday && (
-                <Text style={styles.modeHighScore}>
+                <Text
+                  style={styles.modeHighScore}
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                >
                   {t('home.daily.today', { score: formatScore(todayScore, i18n.language) })}
                 </Text>
               )}
               {hasPlayedToday && (
                 <View style={styles.playedBadge}>
-                  <Text style={styles.playedBadgeText}>{t('home.daily.completed')}</Text>
+                  <Text
+                    style={styles.playedBadgeText}
+                    numberOfLines={1}
+                    adjustsFontSizeToFit
+                  >
+                    {t('home.daily.completed')}
+                  </Text>
                 </View>
               )}
             </Pressable>
@@ -266,11 +304,17 @@ export default function HomeScreen() {
                 onPress={handleGameCenterPress}
                 hitSlop={12}
                 disabled={authInProgress}
+                accessibilityRole="button"
+                accessibilityLabel={t('a11y.sign_in_game_center')}
               >
                 {authInProgress ? (
                   <ActivityIndicator size="small" color="#8CE6CD" />
                 ) : (
-                  <Text style={styles.leaderboardButtonText}>
+                  <Text
+                    style={styles.leaderboardButtonText}
+                    numberOfLines={1}
+                    adjustsFontSizeToFit
+                  >
                     {t('home.game_center.sign_in')}
                   </Text>
                 )}
@@ -300,8 +344,14 @@ export default function HomeScreen() {
                   ]}
                   onPress={handleGameCenterPress}
                   hitSlop={12}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('a11y.open_leaderboard')}
                 >
-                  <Text style={styles.leaderboardButtonText}>
+                  <Text
+                    style={styles.leaderboardButtonText}
+                    numberOfLines={1}
+                    adjustsFontSizeToFit
+                  >
                     {t('home.game_center.leaderboard')}
                   </Text>
                 </Pressable>
@@ -410,6 +460,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: 'rgba(255, 255, 255, 0.45)',
     lineHeight: 20,
+    flexShrink: 1,
   },
   modeSeed: {
     fontSize: 12,

@@ -162,22 +162,40 @@ export default function DailyScreen() {
     return (
       <View style={styles.safe}>
         <View style={[styles.playedContainer, safePadding]}>
-          <Text style={styles.playedTitle}>{t('game.already_played.title')}</Text>
-          <Text style={styles.playedSeed}>{dailySeedLabel}</Text>
-          <Text style={styles.playedLabel}>{t('game.already_played.score_label')}</Text>
-          <Text style={styles.playedScore}>
+          <Text
+            style={styles.playedTitle}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+          >
+            {t('game.already_played.title')}
+          </Text>
+          <Text
+            style={styles.playedSeed}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+          >
+            {dailySeedLabel}
+          </Text>
+          <Text style={styles.playedLabel} numberOfLines={1}>
+            {t('game.already_played.score_label')}
+          </Text>
+          <Text style={styles.playedScore} numberOfLines={1} adjustsFontSizeToFit>
             {game.score > 0
               ? formatScore(game.score, i18n.language)
               : t('game.already_played.played_today')}
           </Text>
-          <Text style={styles.playedHint}>
+          <Text style={styles.playedHint} numberOfLines={2}>
             {t('game.already_played.hint')}
           </Text>
           <Pressable
             style={styles.homeButton}
             onPress={() => router.replace('/')}
+            accessibilityRole="button"
+            accessibilityLabel={t('a11y.go_home')}
           >
-            <Text style={styles.homeButtonText}>{t('game.already_played.home')}</Text>
+            <Text style={styles.homeButtonText} numberOfLines={1}>
+              {t('game.already_played.home')}
+            </Text>
           </Pressable>
         </View>
       </View>
@@ -202,13 +220,20 @@ export default function DailyScreen() {
       >
         {/* Top bar: Home + Gear (posición original) */}
         <View style={styles.topBar}>
-          <Pressable onPress={() => router.back()} style={styles.backButton}>
+          <Pressable
+            onPress={() => router.back()}
+            style={styles.backButton}
+            accessibilityRole="button"
+            accessibilityLabel={t('a11y.back_home')}
+          >
             <Text style={styles.backText}>{t('game.back')}</Text>
           </Pressable>
           <Pressable
             onPress={() => setSettingsVisible(true)}
             style={styles.gearButton}
             hitSlop={10}
+            accessibilityRole="button"
+            accessibilityLabel={t('a11y.open_settings')}
           >
             <Text style={styles.gearIcon}>⚙️</Text>
           </Pressable>
@@ -233,8 +258,10 @@ export default function DailyScreen() {
             <Animated.Text
               style={styles.comboText}
               entering={FadeIn.springify()}
+              numberOfLines={1}
+              adjustsFontSizeToFit
             >
-              {game.comboLabel}
+              {t(game.comboLabel)}
             </Animated.Text>
           </View>
         )}

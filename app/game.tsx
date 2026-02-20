@@ -379,13 +379,20 @@ export default function GameScreen() {
       >
         {/* Top bar: Home + Gear (posición original) */}
         <View style={styles.topBar}>
-          <Pressable onPress={() => router.back()} style={styles.backButton}>
+          <Pressable
+            onPress={() => router.back()}
+            style={styles.backButton}
+            accessibilityRole="button"
+            accessibilityLabel={t('a11y.back_home')}
+          >
             <Text style={styles.backText}>{t('game.back')}</Text>
           </Pressable>
           <Pressable
             onPress={() => setSettingsVisible(true)}
             style={styles.gearButton}
             hitSlop={10}
+            accessibilityRole="button"
+            accessibilityLabel={t('a11y.open_settings')}
           >
             <Text style={styles.gearIcon}>⚙️</Text>
           </Pressable>
