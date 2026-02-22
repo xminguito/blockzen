@@ -333,12 +333,13 @@ public class ExpoGameCenterModule: Module {
 
           guard let entry = localEntry else { return }
 
-          gcLog("challengeComposer: presenting challengeComposeController — leaderboardId='\(leaderboardId)' players=nil (native friend picker)")
+          // Sandbox and TestFlight reject challenges with nil message.
+          // A non-empty string is required for the challenge to be delivered.
+          let defaultMessage = "¡Intenta superar mi récord!"
+          gcLog("challengeComposer: presenting challengeComposeController — leaderboardId='\(leaderboardId)' message='\(defaultMessage)' players=nil (native friend picker)")
 
-          // players: nil → Apple opens its own friend selector, which is the
-          // most compatible approach and avoids "Retos no compatibles" errors.
           let vc = entry.challengeComposeController(
-            withMessage: nil,
+            withMessage: defaultMessage,
             players: nil,
             completionHandler: { composeVC, didIssue, recipients in
               DispatchQueue.main.async {
@@ -358,16 +359,16 @@ public class ExpoGameCenterModule: Module {
 
   // MARK: - Send Vengeance Challenge (iOS 14+ — GKLeaderboard.Entry API)
   //
-  // Unified flow identical to challengeComposer:
+  // Flow:
   //   1. GKLeaderboard.loadLeaderboards — validates the ID.
   //   2. leaderboard.loadEntries(for: .global, range: 1…100) — retrieves
   //      localEntry reliably regardless of rank.
-  //   3. entry.challengeComposeController(players: nil) — Apple's native
-  //      friend picker handles selection; avoids "Retos no compatibles"
-  //      errors caused by passing unresolved/incompatible GKPlayer objects.
-  //
-  // Note: friendId is kept in the signature to preserve the JS API surface
-  // and is included in the pre-filled message for context.
+  //   3. GKPlayer.loadPlayers(forIdentifiers: [friendId]) — resolves the
+  //      target friend into a GKPlayer object so GameKit can pre-select them
+  //      in the compose sheet, maximising delivery rate on TestFlight.
+  //   4. entry.challengeComposeController(players: [friendPlayer]) — if the
+  //      GKPlayer was resolved successfully the friend is pre-selected;
+  //      otherwise falls back to the open friend picker (players: nil).
 
   private func sendVengeanceChallenge(
     friendId: String,
@@ -414,45 +415,53 @@ public class ExpoGameCenterModule: Module {
           gcLog("sendVengeanceChallenge: loadEntries ERROR — \(loadError.localizedDescription)")
         }
 
-        DispatchQueue.main.async {
-          // CRITICAL DEBUG — confirm entry state before launching VC
-          let localId = GKLocalPlayer.local.gamePlayerID
-          if let entry = localEntry {
-            let entryOwnerId = entry.player.gamePlayerID
-            let isLocalPlayer = (entryOwnerId == localId)
-            gcLog("sendVengeanceChallenge: localEntry OK — rank=\(entry.rank) score=\(entry.score) entryPlayerId='\(entryOwnerId)' localPlayerId='\(localId)' isLocalPlayer=\(isLocalPlayer)")
-          } else {
-            gcLog("sendVengeanceChallenge: localEntry is NIL — leaderboardId='\(leaderboardId)' localPlayerId='\(localId)'. Showing leaderboard fallback.")
-            self.presentLeaderboardVC(leaderboardId: leaderboardId, playerScope: .friendsOnly, top: top, promise: promise)
-            return
+        // Resolve the target friend's GKPlayer in parallel with the entry check.
+        // GKPlayer.loadPlayers gives GameKit the concrete player object it needs
+        // to pre-select the recipient and maximise delivery on TestFlight.
+        GKPlayer.loadPlayers(forIdentifiers: [friendId]) { players, playerError in
+          if let playerError = playerError {
+            gcLog("sendVengeanceChallenge: loadPlayers WARN — \(playerError.localizedDescription) — will use open picker")
           }
+          let friendPlayer = players?.first
+          gcLog("sendVengeanceChallenge: friendPlayer=\(friendPlayer?.alias ?? "nil (fallback to open picker)")")
 
-          guard let entry = localEntry else { return }
+          DispatchQueue.main.async {
+            let localId = GKLocalPlayer.local.gamePlayerID
+            guard let entry = localEntry else {
+              gcLog("sendVengeanceChallenge: localEntry is NIL — localPlayerId='\(localId)'. Showing leaderboard fallback.")
+              self.presentLeaderboardVC(leaderboardId: leaderboardId, playerScope: .friendsOnly, top: top, promise: promise)
+              return
+            }
 
-          let msg = message ?? "¡Bateme! Conseguí \(entry.score) puntos."
-          gcLog("sendVengeanceChallenge: presenting challengeComposeController — leaderboardId='\(leaderboardId)' players=nil (native friend picker)")
+            let entryOwnerId = entry.player.gamePlayerID
+            gcLog("sendVengeanceChallenge: localEntry OK — rank=\(entry.rank) score=\(entry.score) entryPlayerId='\(entryOwnerId)' isLocalPlayer=\(entryOwnerId == localId)")
 
-          // players: nil — forces Apple's native friend selector, which is the
-          // most compatible path across all iOS versions (14–17+).
-          let vc = entry.challengeComposeController(
-            withMessage: msg,
-            players: nil,
-            completionHandler: { composeVC, didIssue, recipients in
-              DispatchQueue.main.async {
-                gcLog("sendVengeanceChallenge: compose VC finished — didIssue=\(didIssue) recipients=\(recipients?.count ?? 0)")
-                composeVC.presentingViewController?.dismiss(animated: true)
-                if didIssue {
-                  gcLog("sendVengeanceChallenge: challenge sent successfully")
-                  promise.resolve(nil)
-                } else {
-                  gcLog("sendVengeanceChallenge: user cancelled")
-                  promise.reject(self.errorCodeUserCancelled, "User cancelled challenge")
+            let msg = message ?? "¡Bateme! Conseguí \(entry.score) puntos."
+            // Pass the resolved GKPlayer so the friend is pre-selected.
+            // Falls back to nil (open picker) if loadPlayers failed.
+            let targetPlayers: [GKPlayer]? = friendPlayer.map { [$0] }
+            gcLog("sendVengeanceChallenge: presenting challengeComposeController — players=\(targetPlayers != nil ? friendPlayer!.alias : "nil (open picker)")")
+
+            let vc = entry.challengeComposeController(
+              withMessage: msg,
+              players: targetPlayers,
+              completionHandler: { composeVC, didIssue, recipients in
+                DispatchQueue.main.async {
+                  gcLog("sendVengeanceChallenge: compose VC finished — didIssue=\(didIssue) recipients=\(recipients?.count ?? 0)")
+                  composeVC.presentingViewController?.dismiss(animated: true)
+                  if didIssue {
+                    gcLog("sendVengeanceChallenge: challenge sent successfully")
+                    promise.resolve(nil)
+                  } else {
+                    gcLog("sendVengeanceChallenge: user cancelled")
+                    promise.reject(self.errorCodeUserCancelled, "User cancelled challenge")
+                  }
                 }
               }
-            }
-          )
-          gcLog("sendVengeanceChallenge: calling top.present — topVC=\(type(of: top))")
-          top.present(vc, animated: true)
+            )
+            gcLog("sendVengeanceChallenge: calling top.present — topVC=\(type(of: top))")
+            top.present(vc, animated: true)
+          }
         }
       }
     }
