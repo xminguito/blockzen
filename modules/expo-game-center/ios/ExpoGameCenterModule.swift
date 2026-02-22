@@ -163,6 +163,13 @@ public class ExpoGameCenterModule: Module {
   }
 
   // MARK: - Submit Score (iOS 14+)
+  //
+  // Pre-fetches leaderboard metadata before submitting so iOS has the title
+  // ('Récord Clásico', etc.) cached when it renders the native score banner.
+  // Without this step the banner can display "missing title" on first run.
+  // Note: this function is intentionally scoped to score submission only —
+  // it does NOT trigger any challenge logic, ensuring the challenge banner
+  // only appears when the user explicitly taps Desafiar / Venganza.
 
   private func submitScore(score: Int64, leaderboardId: String, promise: Promise) {
     guard ensureGameCenterAvailable(promise: promise) else { return }
@@ -171,18 +178,30 @@ public class ExpoGameCenterModule: Module {
       return
     }
     if #available(iOS 14.0, *) {
-      GKLeaderboard.submitScore(
-        Int(score), context: 0,
-        player: GKLocalPlayer.local,
-        leaderboardIDs: [leaderboardId]
-      ) { error in
-        DispatchQueue.main.async {
-          if let error = error {
-            gcLog("submitScore error: \(error.localizedDescription)")
-            promise.reject(self.errorCodeUnavailable, error.localizedDescription)
-          } else {
-            gcLog("submitScore success")
-            promise.resolve(nil)
+      // Step 1 — Pre-warm the leaderboard metadata cache so the native banner
+      // shows the correct localised title instead of "missing title".
+      GKLeaderboard.loadLeaderboards(IDs: [leaderboardId]) { leaderboards, metaError in
+        if let metaError = metaError {
+          gcLog("submitScore: loadLeaderboards WARN — \(metaError.localizedDescription) (score will still be submitted)")
+        } else {
+          let title = leaderboards?.first?.title ?? "nil"
+          gcLog("submitScore: leaderboard metadata cached OK — title='\(title)' id='\(leaderboardId)'")
+        }
+
+        // Step 2 — Submit the score regardless of metadata result.
+        GKLeaderboard.submitScore(
+          Int(score), context: 0,
+          player: GKLocalPlayer.local,
+          leaderboardIDs: [leaderboardId]
+        ) { error in
+          DispatchQueue.main.async {
+            if let error = error {
+              gcLog("submitScore ERROR — \(error.localizedDescription)")
+              promise.reject(self.errorCodeUnavailable, error.localizedDescription)
+            } else {
+              gcLog("submitScore SUCCESS — score=\(score) leaderboard='\(leaderboardId)'")
+              promise.resolve(nil)
+            }
           }
         }
       }
