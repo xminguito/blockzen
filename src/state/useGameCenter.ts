@@ -116,17 +116,6 @@ export function useGameCenter(): UseGameCenterReturn {
       });
   }, []);
 
-  // Re-fetch friends scores when the app returns from background (throttled).
-  useEffect(() => {
-    if (Platform.OS !== 'ios') return;
-    const sub = AppState.addEventListener('change', (next) => {
-      if (next === 'active' && playerId && lastLeaderboardIdRef.current) {
-        fetchFriendsScores(lastLeaderboardIdRef.current);
-      }
-    });
-    return () => sub.remove();
-  }, [playerId, fetchFriendsScores]);
-
   const authenticate = useCallback(async (): Promise<boolean> => {
     if (Platform.OS !== 'ios') return false;
     try {
@@ -173,6 +162,17 @@ export function useGameCenter(): UseGameCenterReturn {
         });
     });
   }, []);
+
+  // Re-fetch friends scores when the app returns from background (throttled).
+  useEffect(() => {
+    if (Platform.OS !== 'ios') return;
+    const sub = AppState.addEventListener('change', (next) => {
+      if (next === 'active' && playerId && lastLeaderboardIdRef.current) {
+        fetchFriendsScores(lastLeaderboardIdRef.current);
+      }
+    });
+    return () => sub.remove();
+  }, [playerId, fetchFriendsScores]);
 
   /**
    * Present the native Game Center leaderboard dashboard.
