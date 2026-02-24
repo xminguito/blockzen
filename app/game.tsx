@@ -204,6 +204,7 @@ export default function GameScreen() {
     issueChallenge,
     fetchFriendsScores,
     isAuthenticated,
+    isLoadingFriends,
     isAvailable: isGameCenterAvailable,
     friendsScores,
   } = useGameCenter();
@@ -285,6 +286,13 @@ export default function GameScreen() {
       fetchFriendsScores(LEADERBOARD_IDS.classic);
     }
   }, [isAuthenticated, fetchFriendsScores]);
+
+  // Refresh friends data when the game-over modal opens so counts are fresh.
+  useEffect(() => {
+    if (game.isGameOver && isAuthenticated) {
+      fetchFriendsScores(LEADERBOARD_IDS.classic);
+    }
+  }, [game.isGameOver, isAuthenticated, fetchFriendsScores]);
 
   useEffect(() => {
     currentScoreSV.value = game.score;
@@ -532,6 +540,7 @@ export default function GameScreen() {
             : undefined
         }
         friendsSurpassedCount={friendsScores.filter((f) => f.score < game.score).length}
+        isLoadingFriends={isLoadingFriends}
       />
 
       {/* Settings Modal */}

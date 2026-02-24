@@ -23,8 +23,8 @@
  *      present(), eliminating the "already presenting" silent failure.
  */
 
-import { useCallback, useEffect, useState } from 'react';
-import { InteractionManager, Platform } from 'react-native';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { AppState, InteractionManager, Platform } from 'react-native';
 import * as ExpoGameCenter from 'expo-game-center';
 import type { FriendScore } from 'expo-game-center';
 
@@ -32,11 +32,14 @@ import type { FriendScore } from 'expo-game-center';
 // TYPES
 // ═══════════════════════════════════════════════════════════════════════════
 
+const FETCH_THROTTLE_MS = 60_000;
+
 export interface UseGameCenterReturn {
   isAuthenticated: boolean;
   playerId: string | null;
   alias: string | null;
   isLoading: boolean;
+  isLoadingFriends: boolean;
   isAvailable: boolean;
   friendsScores: FriendScore[];
   /** Friend with score immediately above userScore (next rival to beat) */
@@ -88,6 +91,9 @@ export function useGameCenter(): UseGameCenterReturn {
   const [alias, setAlias] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [friendsScores, setFriendsScores] = useState<FriendScore[]>([]);
+  const [isLoadingFriends, setIsLoadingFriends] = useState(false);
+  const lastFetchTimeRef = useRef<number>(0);
+  const lastLeaderboardIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (Platform.OS !== 'ios') {
@@ -109,6 +115,17 @@ export function useGameCenter(): UseGameCenterReturn {
         setIsLoading(false);
       });
   }, []);
+
+  // Re-fetch friends scores when the app returns from background (throttled).
+  useEffect(() => {
+    if (Platform.OS !== 'ios') return;
+    const sub = AppState.addEventListener('change', (next) => {
+      if (next === 'active' && playerId && lastLeaderboardIdRef.current) {
+        fetchFriendsScores(lastLeaderboardIdRef.current);
+      }
+    });
+    return () => sub.remove();
+  }, [playerId, fetchFriendsScores]);
 
   const authenticate = useCallback(async (): Promise<boolean> => {
     if (Platform.OS !== 'ios') return false;
@@ -136,12 +153,23 @@ export function useGameCenter(): UseGameCenterReturn {
   }, []);
 
   const fetchFriendsScores = useCallback((leaderboardId: string) => {
+    lastLeaderboardIdRef.current = leaderboardId;
+
+    if (Date.now() - lastFetchTimeRef.current < FETCH_THROTTLE_MS) return;
+
+    setIsLoadingFriends(true);
     InteractionManager.runAfterInteractions(() => {
       Promise.resolve(ExpoGameCenter.fetchFriendsScores(leaderboardId))
-        .then(setFriendsScores)
+        .then((scores) => {
+          setFriendsScores(scores);
+          lastFetchTimeRef.current = Date.now();
+        })
         .catch((err) => {
           if (__DEV__) console.error('[GameCenter] fetchFriendsScores error:', err);
           setFriendsScores([]);
+        })
+        .finally(() => {
+          setIsLoadingFriends(false);
         });
     });
   }, []);
@@ -227,6 +255,7 @@ export function useGameCenter(): UseGameCenterReturn {
     playerId,
     alias,
     isLoading,
+    isLoadingFriends,
     isAvailable: ExpoGameCenter.isAvailable?.() ?? false,
     friendsScores,
     nextRival,

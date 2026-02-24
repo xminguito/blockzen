@@ -7,6 +7,7 @@
 
 import React, { useCallback, useEffect } from 'react';
 import {
+  ActivityIndicator,
   View,
   Text,
   StyleSheet,
@@ -66,6 +67,8 @@ export interface GameOverModalProps {
   onIssueChallenge?: () => void;
   /** Number of friends whose score the user beat this game */
   friendsSurpassedCount?: number;
+  /** True while friends scores are being refreshed from Game Center */
+  isLoadingFriends?: boolean;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -86,6 +89,7 @@ export function GameOverModal({
   onSendChallenge,
   onIssueChallenge,
   friendsSurpassedCount,
+  isLoadingFriends,
 }: GameOverModalProps) {
   const { t, i18n } = useTranslation();
 
@@ -216,9 +220,14 @@ export function GameOverModal({
 
           {/* Social context — friends surpassed this game */}
           {showFriendsSurpassed && (
-            <Text style={styles.socialContextText}>
-              {t('game_over.friends_surpassed', { count: friendsSurpassedCount })}
-            </Text>
+            <View style={styles.socialContextRow}>
+              {isLoadingFriends && (
+                <ActivityIndicator size="small" color="rgba(255, 215, 0, 0.75)" />
+              )}
+              <Text style={styles.socialContextText}>
+                {t('game_over.friends_surpassed', { count: friendsSurpassedCount })}
+              </Text>
+            </View>
           )}
 
           {/* Rival Defeated — Vengeance challenge (Gold Trophy button) */}
@@ -406,11 +415,17 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     letterSpacing: 1,
   },
+  socialContextRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    marginBottom: 12,
+  },
   socialContextText: {
     fontSize: 13,
     fontWeight: '600',
     color: 'rgba(255, 215, 0, 0.75)',
-    marginBottom: 12,
     letterSpacing: 0.3,
     textAlign: 'center',
   },
