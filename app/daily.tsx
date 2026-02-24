@@ -38,7 +38,7 @@ import { formatScore } from '../src/core/formatters';
 import { useHighScore } from '../src/state/useHighScore';
 import { useDaily } from '../src/state/useDaily';
 import { useSettings } from '../src/state/useSettings';
-import { useGameCenter } from '../src/state/useGameCenter';
+import { useSocialBridge } from '../src/social/useSocialBridge';
 import { LEADERBOARD_IDS } from '../src/core/constants';
 import { Board, computeBoardGeometry, BOARD_PADDING, INNER_PAD } from '../src/ui/components/Board';
 import { ParticleCanvas } from '../src/ui/components/ParticleCanvas';
@@ -119,7 +119,7 @@ export default function DailyScreen() {
     issueChallenge,
     isAvailable: isGameCenterAvailable,
     friendsScores,
-  } = useGameCenter();
+  } = useSocialBridge();
   const [settingsVisible, setSettingsVisible] = useState(false);
 
   // Handle game over: submit score + record daily result

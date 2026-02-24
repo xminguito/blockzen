@@ -1,0 +1,2 @@
+patchedDependencies:
+  expo-localization: patches/expo-localization.patch

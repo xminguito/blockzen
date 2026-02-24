@@ -11,7 +11,6 @@ import {
   Text,
   StyleSheet,
   Pressable,
-  Platform,
   Alert,
   ActivityIndicator,
   ScrollView,
@@ -26,7 +25,7 @@ import { useTranslation } from 'react-i18next';
 
 import { readHighScore } from '../src/state/useHighScore';
 import { useDaily } from '../src/state/useDaily';
-import { useGameCenter } from '../src/state/useGameCenter';
+import { useSocialBridge } from '../src/social/useSocialBridge';
 import { LEADERBOARD_IDS } from '../src/core/constants';
 import { formatScore } from '../src/core/formatters';
 
@@ -131,7 +130,7 @@ export default function HomeScreen() {
     authenticate,
     presentDashboard,
     isAvailable,
-  } = useGameCenter();
+  } = useSocialBridge();
   const [authInProgress, setAuthInProgress] = useState(false);
 
   const handleGameCenterPress = async () => {
@@ -168,7 +167,7 @@ export default function HomeScreen() {
   }, []);
 
   useEffect(() => {
-    if (Platform.OS === 'ios' && isAuthenticated) {
+    if (isAuthenticated) {
       fetchFriendsScores(LEADERBOARD_IDS.classic);
     }
   }, [isAuthenticated, fetchFriendsScores]);
@@ -289,8 +288,8 @@ export default function HomeScreen() {
           </Animated.View>
         </View>
 
-        {/* Game Center (iOS): sign-in + leaderboard */}
-        {Platform.OS === 'ios' && (
+        {/* Social: sign-in + leaderboard (visible when a social provider is available) */}
+        {isAvailable && (
           <Animated.View
             style={styles.gameCenterSection}
             entering={FadeInUp.delay(400).springify()}

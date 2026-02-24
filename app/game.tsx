@@ -40,7 +40,8 @@ import { useTranslation } from 'react-i18next';
 import { useGame, triggerHaptic } from '../src/state/useGame';
 import { useHighScore } from '../src/state/useHighScore';
 import { useSettings } from '../src/state/useSettings';
-import { useGameCenter } from '../src/state/useGameCenter';
+import { useSocialBridge } from '../src/social/useSocialBridge';
+import type { SocialFriendScore } from '../src/social/SocialProvider';
 import { LEADERBOARD_IDS } from '../src/core/constants';
 import { formatScore } from '../src/core/formatters';
 import { Board, computeBoardGeometry, BOARD_PADDING, INNER_PAD } from '../src/ui/components/Board';
@@ -49,7 +50,6 @@ import type { ParticleCanvasHandle } from '../src/ui/components/ParticleCanvas';
 import { BlockTray } from '../src/ui/components/BlockTray';
 import { GameOverModal } from '../src/ui/components/GameOverModal';
 import { SettingsModal } from '../src/ui/components/SettingsModal';
-import type { FriendScore } from 'expo-game-center';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // CONSTANTS
@@ -207,13 +207,13 @@ export default function GameScreen() {
     isLoadingFriends,
     isAvailable: isGameCenterAvailable,
     friendsScores,
-  } = useGameCenter();
+  } = useSocialBridge();
   const [settingsVisible, setSettingsVisible] = useState(false);
 
   // ── Vengeance system ──
   const particleRef = useRef<ParticleCanvasHandle>(null);
   const rival = nextRival(highScore);
-  const rivalDefeatedRef = useRef<FriendScore | null>(null);
+  const rivalDefeatedRef = useRef<SocialFriendScore | null>(null);
   const vengeanceIdRef = useRef(0);
   const vengeanceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [vengeanceOverlay, setVengeanceOverlay] = useState<{
