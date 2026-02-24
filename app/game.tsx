@@ -428,6 +428,8 @@ export default function GameScreen() {
             ghostGrid={game.ghostGrid}
             ghostColorId={game.ghostColorId}
             ghostValid={game.ghostValid}
+            ghostClearPrediction={game.ghostClearPrediction}
+            ghostProjectedScore={game.ghostProjectedScore}
             rivalScore={rivalScoreSV}
             currentScore={currentScoreSV}
             rivalAlias={rival?.alias}

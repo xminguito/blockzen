@@ -158,6 +158,8 @@ export interface UseGameReturn {
   ghostGrid: ReturnType<typeof useSharedValue<number[]>>;
   ghostColorId: ReturnType<typeof useSharedValue<number>>;
   ghostValid: ReturnType<typeof useSharedValue<number>>;
+  ghostClearPrediction: ReturnType<typeof useSharedValue<number[]>>;
+  ghostProjectedScore: ReturnType<typeof useSharedValue<number>>;
 
   // ── React State (UI re-renders) ──
   score: number;
@@ -221,6 +223,8 @@ export function useGame(mode: GameMode = 'classic'): UseGameReturn {
   const ghostGrid = useSharedValue<number[]>([...EMPTY_GRID_64]);
   const ghostColorId = useSharedValue<number>(0);
   const ghostValid = useSharedValue<number>(0);
+  const ghostClearPrediction = useSharedValue<number[]>([...EMPTY_GRID_64]);
+  const ghostProjectedScore = useSharedValue<number>(0);
 
   // ─────────────────────────────────────────────────────────────────────────
   // REACT STATE — triggers UI re-renders
@@ -295,6 +299,8 @@ export function useGame(mode: GameMode = 'classic'): UseGameReturn {
       ghostGrid.value = [...EMPTY_GRID_64];
       ghostColorId.value = 0;
       ghostValid.value = 0;
+      ghostClearPrediction.value = [...EMPTY_GRID_64];
+      ghostProjectedScore.value = 0;
 
       const pieces = generateTrayPieces(rng);
 
@@ -314,7 +320,7 @@ export function useGame(mode: GameMode = 'classic'): UseGameReturn {
       setLinesCleared(0);
       setIsAnimating(false);
     },
-    [setTray, gridDisplay, clearingCells, ghostGrid, ghostColorId, ghostValid],
+    [setTray, gridDisplay, clearingCells, ghostGrid, ghostColorId, ghostValid, ghostClearPrediction, ghostProjectedScore],
   );
 
   useEffect(() => {
@@ -618,12 +624,16 @@ export function useGame(mode: GameMode = 'classic'): UseGameReturn {
     (blockIndex: number, row: number, col: number) => {
       if (animatingRef.current || gameOverRef.current) {
         ghostGrid.value = [...EMPTY_GRID_64];
+        ghostClearPrediction.value = [...EMPTY_GRID_64];
+        ghostProjectedScore.value = 0;
         return;
       }
 
       const piece = trayRef.current[blockIndex];
       if (!piece || piece.placed) {
         ghostGrid.value = [...EMPTY_GRID_64];
+        ghostClearPrediction.value = [...EMPTY_GRID_64];
+        ghostProjectedScore.value = 0;
         return;
       }
 
@@ -651,15 +661,63 @@ export function useGame(mode: GameMode = 'classic'): UseGameReturn {
       ghostGrid.value = grid;
       ghostColorId.value = piece.colorId;
       ghostValid.value = valid ? 1 : 0;
+
+      // Vengeance prediction: lightweight O(128) scan for lines that would clear
+      if (valid) {
+        const clearPred = [...EMPTY_GRID_64];
+        let projectedLines = 0;
+        const truth = gridRef.current;
+
+        for (let r = 0; r < 8; r++) {
+          const base = r << 3;
+          let complete = true;
+          for (let c = 0; c < 8; c++) {
+            const idx = base | c;
+            if ((truth[idx] & 7) === 0 && grid[idx] === 0) {
+              complete = false;
+              break;
+            }
+          }
+          if (complete) {
+            projectedLines++;
+            for (let c = 0; c < 8; c++) clearPred[base | c] = 1;
+          }
+        }
+
+        for (let c = 0; c < 8; c++) {
+          let complete = true;
+          for (let r = 0; r < 8; r++) {
+            const idx = (r << 3) | c;
+            if ((truth[idx] & 7) === 0 && grid[idx] === 0) {
+              complete = false;
+              break;
+            }
+          }
+          if (complete) {
+            projectedLines++;
+            for (let r = 0; r < 8; r++) clearPred[(r << 3) | c] = 1;
+          }
+        }
+
+        ghostClearPrediction.value = clearPred;
+        ghostProjectedScore.value = projectedLines > 0
+          ? scoreRef.current + calculateScore(block.cellCount, projectedLines, comboRef.current).total
+          : 0;
+      } else {
+        ghostClearPrediction.value = [...EMPTY_GRID_64];
+        ghostProjectedScore.value = 0;
+      }
     },
-    [ghostGrid, ghostColorId, ghostValid],
+    [ghostGrid, ghostColorId, ghostValid, ghostClearPrediction, ghostProjectedScore],
   );
 
   const clearGhostPreview = useCallback(() => {
     ghostGrid.value = [...EMPTY_GRID_64];
     ghostColorId.value = 0;
     ghostValid.value = 0;
-  }, [ghostGrid, ghostColorId, ghostValid]);
+    ghostClearPrediction.value = [...EMPTY_GRID_64];
+    ghostProjectedScore.value = 0;
+  }, [ghostGrid, ghostColorId, ghostValid, ghostClearPrediction, ghostProjectedScore]);
 
   // ─────────────────────────────────────────────────────────────────────────
   // PLACEMENT VALIDATION (for external use by gesture handlers)
@@ -693,6 +751,8 @@ export function useGame(mode: GameMode = 'classic'): UseGameReturn {
     ghostGrid,
     ghostColorId,
     ghostValid,
+    ghostClearPrediction,
+    ghostProjectedScore,
     score,
     combo,
     comboLabel,

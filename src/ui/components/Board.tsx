@@ -17,7 +17,16 @@
 import React, { useMemo } from 'react';
 import { View, Text, StyleSheet, useWindowDimensions } from 'react-native';
 import { Canvas, RoundedRect, Group, Circle } from '@shopify/react-native-skia';
-import Animated, { useDerivedValue, useAnimatedStyle } from 'react-native-reanimated';
+import Animated, {
+  useDerivedValue,
+  useAnimatedStyle,
+  useSharedValue,
+  useAnimatedReaction,
+  withRepeat,
+  withSequence,
+  withTiming,
+  cancelAnimation,
+} from 'react-native-reanimated';
 import type { SharedValue } from 'react-native-reanimated';
 
 import { PALETTE } from '../shaders/PatternShaders';
@@ -73,6 +82,7 @@ const CLEARING_GLOW_COLOR = 'rgba(255, 255, 255, 0.75)';
 const GHOST_VALID_COLOR = 'rgba(140, 230, 205, 0.35)';
 const GHOST_INVALID_COLOR = 'rgba(255, 100, 100, 0.15)';
 const RESCUE_SHIELD_COLOR = 'rgba(255, 235, 115, 0.30)';
+const PREDICTION_GLOW_COLOR = 'rgba(255, 255, 255, 0.3)';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // PROPS
@@ -84,6 +94,8 @@ export interface BoardProps {
   ghostGrid: SharedValue<number[]>;
   ghostColorId: SharedValue<number>;
   ghostValid: SharedValue<number>;
+  ghostClearPrediction?: SharedValue<number[]>;
+  ghostProjectedScore?: SharedValue<number>;
   patternsEnabled?: boolean;
   rivalScore?: SharedValue<number>;
   currentScore?: SharedValue<number>;
@@ -100,6 +112,8 @@ export function Board({
   ghostGrid,
   ghostColorId,
   ghostValid,
+  ghostClearPrediction,
+  ghostProjectedScore,
   rivalScore,
   currentScore,
   rivalAlias,
@@ -118,6 +132,33 @@ export function Board({
   const { containerSize, cellSize, cornerRadius, stride } = geometry;
   const hasRival = rivalScore != null && currentScore != null;
 
+  // Vengeance prediction: projected score would surpass rival
+  const isVengeanceMove = useDerivedValue(() => {
+    if (!rivalScore || rivalScore.value <= 0) return 0;
+    if (!currentScore || currentScore.value >= rivalScore.value) return 0;
+    if (!ghostProjectedScore || ghostProjectedScore.value <= 0) return 0;
+    return ghostProjectedScore.value >= rivalScore.value ? 1 : 0;
+  });
+
+  const vengeancePulse = useSharedValue(0);
+  useAnimatedReaction(
+    () => isVengeanceMove.value,
+    (curr, prev) => {
+      if (curr === 1 && prev !== 1) {
+        vengeancePulse.value = withRepeat(
+          withSequence(
+            withTiming(1, { duration: 500 }),
+            withTiming(0, { duration: 500 }),
+          ),
+          -1,
+        );
+      } else if (curr === 0 && prev === 1) {
+        cancelAnimation(vengeancePulse);
+        vengeancePulse.value = 0;
+      }
+    },
+  );
+
   return (
     <View style={[styles.container, { width: containerSize, height: containerSize }]}>
       <Canvas style={{ width: containerSize, height: containerSize }}>
@@ -135,6 +176,9 @@ export function Board({
             ghostGrid={ghostGrid}
             ghostColorId={ghostColorId}
             ghostValid={ghostValid}
+            ghostClearPrediction={ghostClearPrediction}
+            isVengeanceMove={isVengeanceMove}
+            vengeancePulse={vengeancePulse}
           />
         ))}
         {hasRival && (
@@ -173,6 +217,9 @@ interface CellNodeProps {
   ghostGrid: SharedValue<number[]>;
   ghostColorId: SharedValue<number>;
   ghostValid: SharedValue<number>;
+  ghostClearPrediction?: SharedValue<number[]>;
+  isVengeanceMove: SharedValue<number>;
+  vengeancePulse: SharedValue<number>;
 }
 
 function CellNode({
@@ -187,6 +234,9 @@ function CellNode({
   ghostGrid,
   ghostColorId,
   ghostValid,
+  ghostClearPrediction,
+  isVengeanceMove,
+  vengeancePulse,
 }: CellNodeProps) {
   const row = Math.floor(index / 8);
   const col = index % 8;
@@ -198,10 +248,21 @@ function CellNode({
     const val = gridDisplay.value[index] || 0;
     const colorId = val & 7;
 
-    // Clearing glow override
+    // Clearing glow override (active animation)
     const clearList = clearingCells.value;
     for (let i = 0; i < clearList.length; i++) {
       if (clearList[i] === index) return CLEARING_GLOW_COLOR;
+    }
+
+    // Prediction glow: cells in lines that would clear on ghost placement
+    const predVal = ghostClearPrediction ? ghostClearPrediction.value[index] || 0 : 0;
+    if (predVal > 0.5) {
+      if (isVengeanceMove.value > 0.5) {
+        const pulse = vengeancePulse.value;
+        const opacity = 0.3 + pulse * 0.3;
+        return `rgba(255, 215, 0, ${opacity.toFixed(2)})`;
+      }
+      return PREDICTION_GLOW_COLOR;
     }
 
     if (colorId === 0) {
@@ -230,6 +291,9 @@ function CellNode({
     }
     if ((val & 8) !== 0) return 'transparent';
 
+    const predVal = ghostClearPrediction ? ghostClearPrediction.value[index] || 0 : 0;
+    if (predVal > 0.5) return 'transparent';
+
     return PALETTE_HEX_DARK[colorId] || 'transparent';
   });
 
@@ -244,6 +308,9 @@ function CellNode({
       if (clearList[i] === index) return 'transparent';
     }
     if ((val & 8) !== 0) return 'transparent';
+
+    const predVal = ghostClearPrediction ? ghostClearPrediction.value[index] || 0 : 0;
+    if (predVal > 0.5) return 'transparent';
 
     return PALETTE_HEX_LIGHT[colorId] || 'transparent';
   });
