@@ -1,0 +1,22 @@
+{
+  "name": "expo-play-games",
+  "version": "1.0.0",
+  "description": "Google Play Games Services integration for Expo",
+  "main": "src/ExpoPlayGames.ts",
+  "types": "src/ExpoPlayGames.ts",
+  "scripts": {
+    "build": "expo-module build",
+    "clean": "expo-module clean",
+    "lint": "expo-module lint"
+  },
+  "keywords": ["expo", "play-games", "google", "leaderboard", "android"],
+  "repository": { "type": "git", "url": "" },
+  "author": "",
+  "license": "MIT",
+  "peerDependencies": {
+    "expo": "*"
+  },
+  "devDependencies": {
+    "expo-module-scripts": "^4.0.3"
+  }
+}

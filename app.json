@@ -29,13 +29,15 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#0f2725"
       },
-      "package": "com.blockzen.app"
+      "package": "com.blockzen.app",
+      "permissions": ["INTERNET"]
     },
     "plugins": [
       "expo-router",
       "expo-asset",
       "expo-font",
       "./plugins/withGameCenter",
+      "./plugins/withPlayGames",
       "expo-localization"
     ],
     "experiments": {
@@ -47,7 +49,8 @@
       },
       "eas": {
         "projectId": "c6e81758-a94d-4c50-91d9-49b22c7d1468"
-      }
+      },
+      "googlePlayGamesAppId": "949312223266"
     }
   }
 }
