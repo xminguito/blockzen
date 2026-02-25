@@ -14,6 +14,7 @@ import {
   Alert,
   ActivityIndicator,
   ScrollView,
+  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -124,6 +125,7 @@ export default function HomeScreen() {
   const [classicHigh, setClassicHigh] = useState(0);
   const { dailySeedLabel, hasPlayedToday, todayScore, isLoading } = useDaily();
   const {
+    serviceNameKey,
     isAuthenticated,
     friendsScores,
     fetchFriendsScores,
@@ -131,17 +133,23 @@ export default function HomeScreen() {
     presentDashboard,
     isAvailable,
   } = useSocialBridge();
+
+  const serviceName = t(`home.social.service_${serviceNameKey}`);
   const [authInProgress, setAuthInProgress] = useState(false);
 
-  const handleGameCenterPress = async () => {
+  const handleSocialPress = async () => {
     if (isAuthenticated) {
       await presentDashboard(LEADERBOARD_IDS.classic);
       return;
     }
     if (!isAvailable) {
+      const msgKey =
+        Platform.OS === 'android'
+          ? 'home.social.unavailable_message_android'
+          : 'home.social.unavailable_message_ios';
       Alert.alert(
-        t('home.game_center.unavailable_title'),
-        t('home.game_center.unavailable_message'),
+        t('home.social.unavailable_title', { service: serviceName }),
+        t(msgKey),
       );
       return;
     }
@@ -149,9 +157,9 @@ export default function HomeScreen() {
     try {
       const ok = await authenticate();
       if (ok) {
-        Alert.alert('Game Center', t('home.game_center.success'));
+        Alert.alert(serviceName, t('home.social.success'));
       } else {
-        Alert.alert('Game Center', t('home.game_center.error'));
+        Alert.alert(serviceName, t('home.social.error', { service: serviceName }));
       }
     } catch {
       // Silent — authenticate() already handles errors internally
@@ -300,11 +308,11 @@ export default function HomeScreen() {
                   styles.leaderboardButton,
                   pressed && styles.leaderboardPressed,
                 ]}
-                onPress={handleGameCenterPress}
+                onPress={handleSocialPress}
                 hitSlop={12}
                 disabled={authInProgress}
                 accessibilityRole="button"
-                accessibilityLabel={t('a11y.sign_in_game_center')}
+                accessibilityLabel={t('home.social.sign_in', { service: serviceName })}
               >
                 {authInProgress ? (
                   <ActivityIndicator size="small" color="#8CE6CD" />
@@ -314,7 +322,7 @@ export default function HomeScreen() {
                     numberOfLines={1}
                     adjustsFontSizeToFit
                   >
-                    {t('home.game_center.sign_in')}
+                    {t('home.social.sign_in', { service: serviceName })}
                   </Text>
                 )}
               </Pressable>
@@ -341,17 +349,17 @@ export default function HomeScreen() {
                     styles.leaderboardButton,
                     pressed && styles.leaderboardPressed,
                   ]}
-                  onPress={handleGameCenterPress}
+                  onPress={handleSocialPress}
                   hitSlop={12}
                   accessibilityRole="button"
-                  accessibilityLabel={t('a11y.open_leaderboard')}
+                  accessibilityLabel={t('home.social.open_leaderboard', { service: serviceName })}
                 >
                   <Text
                     style={styles.leaderboardButtonText}
                     numberOfLines={1}
                     adjustsFontSizeToFit
                   >
-                    {t('home.game_center.leaderboard')}
+                    {t('home.social.leaderboard')}
                   </Text>
                 </Pressable>
               </>

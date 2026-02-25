@@ -10,7 +10,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { AppState, InteractionManager } from 'react-native';
+import { AppState, InteractionManager, Platform } from 'react-native';
 
 import { getSocialProvider } from './createSocialProvider';
 import type { SocialFriendScore } from './SocialProvider';
@@ -21,7 +21,12 @@ import type { SocialFriendScore } from './SocialProvider';
 
 const FETCH_THROTTLE_MS = 60_000;
 
+/** Key for i18n: home.social.service_${serviceNameKey} → localized service name */
+export type SocialServiceNameKey = 'game_center' | 'play_games' | 'social';
+
 export interface UseSocialBridgeReturn {
+  /** Platform-specific key for service name i18n (e.g. t(`home.social.service_${serviceNameKey}`)) */
+  serviceNameKey: SocialServiceNameKey;
   isAuthenticated: boolean;
   playerId: string | null;
   alias: string | null;
@@ -172,7 +177,11 @@ export function useSocialBridge(): UseSocialBridgeReturn {
     [friendsScores],
   );
 
+  const serviceNameKey: SocialServiceNameKey =
+    Platform.OS === 'ios' ? 'game_center' : Platform.OS === 'android' ? 'play_games' : 'social';
+
   return {
+    serviceNameKey,
     isAuthenticated: !!playerId,
     playerId,
     alias,

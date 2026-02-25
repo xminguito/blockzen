@@ -31,6 +31,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import { useTranslation } from 'react-i18next';
 
+import { useSocialBridge } from '../../social/useSocialBridge';
 import { formatScore } from '../../core/formatters';
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -57,17 +58,17 @@ export interface GameOverModalProps {
   mode: 'classic' | 'daily';
   onRestart: () => void;
   onHome: () => void;
-  /** Optional: opens Game Center leaderboard (iOS only) */
+  /** Optional: opens the platform leaderboard (Game Center on iOS, Play Games on Android) */
   onShowLeaderboard?: () => void;
   /** Friend surpassed this game — enables challenge button */
   rivalDefeated?: { alias: string; playerId: string } | null;
   /** Send vengeance challenge to the defeated rival */
   onSendChallenge?: () => void;
-  /** Open Apple's native friend picker to challenge anyone — shown on new high score */
+  /** Open native friend picker to challenge anyone — shown on new high score (iOS only) */
   onIssueChallenge?: () => void;
   /** Number of friends whose score the user beat this game */
   friendsSurpassedCount?: number;
-  /** True while friends scores are being refreshed from Game Center */
+  /** True while friends scores are being refreshed from the social service */
   isLoadingFriends?: boolean;
 }
 
@@ -92,6 +93,10 @@ export function GameOverModal({
   isLoadingFriends,
 }: GameOverModalProps) {
   const { t, i18n } = useTranslation();
+  const { serviceNameKey } = useSocialBridge();
+  const leaderboardA11yLabel = t('home.social.open_leaderboard', {
+    service: t(`home.social.service_${serviceNameKey}`),
+  });
 
   // ── Spring entrance: vengeanceButton pops in 400ms after modal ──
   const buttonScale = useSharedValue(0);
@@ -165,7 +170,7 @@ export function GameOverModal({
             </View>
           )}
 
-          {/* Challenge Friends — only on new high score, only if Game Center is wired */}
+          {/* Challenge Friends — only on new high score, only if social provider is wired */}
           {isNewHighScore && onIssueChallenge != null && (
             <View style={styles.goldButtonGlow}>
               <Pressable
@@ -302,7 +307,7 @@ export function GameOverModal({
                 style={[styles.button, styles.leaderboardButton]}
                 onPress={onShowLeaderboard}
                 accessibilityRole="button"
-                accessibilityLabel={t('a11y.open_game_center_leaderboard')}
+                accessibilityLabel={leaderboardA11yLabel}
               >
                 <Text
                   style={[styles.buttonText, styles.leaderboardText]}

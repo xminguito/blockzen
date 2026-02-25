@@ -26,6 +26,19 @@
       "unavailable_message": "The native module is not loaded. Rebuild the app with: npx expo run:ios --device",
       "success": "Signed in successfully.",
       "error": "Could not connect. Are you logged in to Settings > Game Center?"
+    },
+    "social": {
+      "service_game_center": "Game Center",
+      "service_play_games": "Play Games",
+      "service_social": "Social",
+      "sign_in": "Sign in to {{service}}",
+      "leaderboard": "View Leaderboard",
+      "unavailable_title": "{{service}} unavailable",
+      "unavailable_message_ios": "The native module is not loaded. Rebuild the app with: npx expo run:ios --device",
+      "unavailable_message_android": "The native module is not loaded. Rebuild the app with: npx expo run:android --device",
+      "success": "Signed in successfully.",
+      "error": "Could not connect. Are you signed in to {{service}}?",
+      "open_leaderboard": "Open {{service}} leaderboard"
     }
   },
   "game": {
@@ -83,14 +96,14 @@
   "a11y": {
     "play_classic": "Play Classic mode",
     "play_daily": "Play Daily Challenge",
-    "sign_in_game_center": "Sign in to Game Center",
+    "sign_in_social": "Sign in to social service",
     "open_leaderboard": "Open leaderboard",
     "open_settings": "Open settings",
     "close_settings": "Close settings",
     "play_again": "Play again",
     "view_board": "View the board",
     "go_home": "Go to home screen",
-    "open_game_center_leaderboard": "Open Game Center leaderboard",
+    "open_social_leaderboard": "Open social leaderboard",
     "send_challenge_to": "Send challenge to {{alias}}",
     "back_home": "Back to home"
   }
