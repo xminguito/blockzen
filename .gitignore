@@ -23,3 +23,7 @@ node_modules
 
 # Android build outputs
 **/android/build/
+
+# Android signing (nunca commitear credenciales)
+android/keystore.properties
+android/*-release.keystore
