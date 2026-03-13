@@ -20,3 +20,6 @@ node_modules
 *.apk
 *.aab
 .DS_Store
+
+# Android build outputs
+**/android/build/
