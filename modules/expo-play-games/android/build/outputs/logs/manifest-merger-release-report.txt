@@ -1,0 +1,16 @@
+-- Merging decision tree log ---
+manifest
+ADDED from /Users/xaviminguito/Sites/blockzen/modules/expo-play-games/android/build/intermediates/tmp/ProcessLibraryManifest/release/tempAndroidManifest678164065659984181.xml:2:13-83
+INJECTED from /Users/xaviminguito/Sites/blockzen/modules/expo-play-games/android/build/intermediates/tmp/ProcessLibraryManifest/release/tempAndroidManifest678164065659984181.xml:2:13-83
+	package
+		INJECTED from /Users/xaviminguito/Sites/blockzen/modules/expo-play-games/android/build/intermediates/tmp/ProcessLibraryManifest/release/tempAndroidManifest678164065659984181.xml
+	xmlns:android
+		ADDED from /Users/xaviminguito/Sites/blockzen/modules/expo-play-games/android/build/intermediates/tmp/ProcessLibraryManifest/release/tempAndroidManifest678164065659984181.xml:2:23-81
+uses-sdk
+INJECTED from /Users/xaviminguito/Sites/blockzen/modules/expo-play-games/android/build/intermediates/tmp/ProcessLibraryManifest/release/tempAndroidManifest678164065659984181.xml reason: use-sdk injection requested
+INJECTED from /Users/xaviminguito/Sites/blockzen/modules/expo-play-games/android/build/intermediates/tmp/ProcessLibraryManifest/release/tempAndroidManifest678164065659984181.xml
+INJECTED from /Users/xaviminguito/Sites/blockzen/modules/expo-play-games/android/build/intermediates/tmp/ProcessLibraryManifest/release/tempAndroidManifest678164065659984181.xml
+	android:targetSdkVersion
+		INJECTED from /Users/xaviminguito/Sites/blockzen/modules/expo-play-games/android/build/intermediates/tmp/ProcessLibraryManifest/release/tempAndroidManifest678164065659984181.xml
+	android:minSdkVersion
+		INJECTED from /Users/xaviminguito/Sites/blockzen/modules/expo-play-games/android/build/intermediates/tmp/ProcessLibraryManifest/release/tempAndroidManifest678164065659984181.xml

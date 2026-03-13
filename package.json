@@ -5,6 +5,10 @@
   "scripts": {
     "start": "expo start",
     "android": "expo run:android",
+    "android:build": "cd android && ./gradlew assembleRelease",
+    "android:build:clean": "cd android && ./gradlew clean assembleRelease",
+    "android:bundle": "cd android && ./gradlew bundleRelease",
+    "android:bundle:clean": "cd android && ./gradlew clean bundleRelease",
     "ios": "expo run:ios"
   },
   "dependencies": {
@@ -39,6 +43,7 @@
   },
   "devDependencies": {
     "@babel/core": "^7.25.0",
+    "path-scurry": "^1.11.1",
     "typescript": "~5.3.0"
   },
   "private": true

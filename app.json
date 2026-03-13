@@ -22,7 +22,8 @@
       },
       "entitlements": {
         "com.apple.developer.game-center": true
-      }
+      },
+      "buildNumber": "6"
     },
     "android": {
       "adaptiveIcon": {
@@ -30,7 +31,9 @@
         "backgroundColor": "#0f2725"
       },
       "package": "com.blockzen.app",
-      "permissions": ["INTERNET"]
+      "permissions": [
+        "INTERNET"
+      ]
     },
     "plugins": [
       "expo-router",
